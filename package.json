@@ -1,0 +1,57 @@
+{
+  "name": "@knotree/client",
+  "version": "0.1.0",
+  "description": "TinyBase JavaScript/TypeScript client for browser and Node.js",
+  "keywords": [
+    "tinybase",
+    "baas",
+    "database",
+    "authentication",
+    "typescript",
+    "javascript",
+    "sdk"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "npm run clean && npm run build",
+    "verify:package": "node ./scripts/verify-package.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Knotree/client-js.git"
+  },
+  "homepage": "https://github.com/Knotree/client-js#readme",
+  "bugs": {
+    "url": "https://github.com/Knotree/client-js/issues"
+  },
+  "author": "Knotree",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}
