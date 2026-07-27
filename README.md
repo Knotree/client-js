@@ -47,6 +47,40 @@ console.log(greeting?.message, response?.invocationId, response?.version);
 
 `projectKey` is the project's public `tb_pk_*` key. Never configure this browser client with a `tb_sk_*` service key.
 
+## Reading and returning written rows
+
+Use `select()` for reads:
+
+```ts
+const { data: todo } = await tinybase
+  .from("todos")
+  .select("*")
+  .eq("id", todoId)
+  .maybeSingle();
+```
+
+Chain `select()` after a mutation to keep the write method and return the
+affected row, following the familiar Supabase-style pattern:
+
+```ts
+const { data: created } = await tinybase
+  .from("todos")
+  .insert({ title: "Ship calendar" })
+  .select()
+  .single();
+
+const { data: updated } = await tinybase
+  .from("todos")
+  .update({ completed: true })
+  .eq("id", todoId)
+  .select()
+  .maybeSingle();
+```
+
+TinyBase currently returns the full affected row for mutation representation.
+Selecting a subset of returning columns can be added when the Data API supports
+it.
+
 ## Identity, ownership, and CORS
 
 The dashboard login is the **platform owner** identity. `tinybase.auth.*` creates and signs in **app users** for one project; the resulting app-user JWT is attached automatically to Data API requests and becomes `auth.uid()` inside PostgreSQL RLS.

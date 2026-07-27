@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.5 — 2026-07-27
+
+- Fix `insert().select()`, `update().select()`, and `delete().select()` so
+  `select()` requests mutation representation without changing the HTTP method
+  to `GET`.
+- Restore Supabase-style write-and-return chaining. Before this release,
+  chaining `select()` after a mutation accidentally performed a read instead
+  of the requested write.
+- Add regression coverage for read, insert, and update HTTP methods, mutation
+  bodies, filters, and `returning=representation`.
+
 ## 0.1.4 — 2026-07-27
 
 - Move npm releases to GitHub Actions Trusted Publishing with short-lived OIDC

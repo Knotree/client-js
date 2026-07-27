@@ -39,8 +39,12 @@ export class QueryBuilder<
   }
 
   select(columns: string = "*"): this {
-    this.state.method = "GET";
     this.state.select = columns;
+    if (this.state.method === "POST" || this.state.method === "PATCH" || this.state.method === "DELETE") {
+      this.state.returning = "representation";
+    } else {
+      this.state.method = "GET";
+    }
     return this;
   }
 

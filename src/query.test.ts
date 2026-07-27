@@ -30,8 +30,9 @@ describe("query builder", () => {
   });
 
   it("builds select with filters order limit", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      expect(init?.method).toBe("GET");
       expect(url).toContain("/v1/data/todos");
       expect(url).toContain("select=id%2Ctitle");
       expect(url).toContain("completed=eq.false");
@@ -134,6 +135,76 @@ describe("query builder", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify({ title: "Build" }));
+  });
+
+  it("insert().select().maybeSingle() stays POST and returns the inserted row", async () => {
+    const row = { title: "Calendar", timezone: "Asia/Saigon" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBe(JSON.stringify(row));
+      expect(String(input)).toContain("returning=representation");
+      return jsonResponse(
+        {
+          data: { id: "setting-1", ...row },
+          error: null,
+          meta: { request_id: "r-insert-select", count: 1 },
+        },
+        201,
+      );
+    });
+
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage: new MemoryStorage(),
+      persistSession: false,
+      autoRefreshToken: false,
+    });
+
+    const { data, error } = await client
+      .from("user_settings")
+      .insert(row)
+      .select("*")
+      .maybeSingle();
+
+    expect(error).toBeNull();
+    expect(data).toEqual({ id: "setting-1", ...row });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("update().eq().select() stays PATCH with representation", async () => {
+    const patch = { completed: true };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.method).toBe("PATCH");
+      expect(init?.body).toBe(JSON.stringify(patch));
+      expect(String(input)).toContain("id=eq.abc");
+      expect(String(input)).toContain("returning=representation");
+      return jsonResponse({
+        data: [{ id: "abc", completed: true }],
+        error: null,
+        meta: { request_id: "r-update-select", count: 1 },
+      });
+    });
+
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage: new MemoryStorage(),
+      persistSession: false,
+      autoRefreshToken: false,
+    });
+
+    const { data, error } = await client
+      .from("todos")
+      .update(patch)
+      .eq("id", "abc")
+      .select();
+
+    expect(error).toBeNull();
+    expect(data).toEqual([{ id: "abc", completed: true }]);
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("update and delete require filters in query string", async () => {
