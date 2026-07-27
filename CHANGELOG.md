@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4 — 2026-07-27
+
+- Move npm releases to GitHub Actions Trusted Publishing with short-lived OIDC
+  credentials and automatic provenance.
+- Test every push and pull request on Node.js 18, 20, 22, and 24.
+- Verify package identity, version tag, license, repository, build, tests, and
+  packed-consumer behavior before publication.
+
 ## 0.1.3 — 2026-07-27
 
 - Default the SDK API base URL to the production deployment at
