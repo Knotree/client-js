@@ -127,6 +127,9 @@ Releases are published by GitHub Actions through npm Trusted Publishing:
 
 No npm write token is stored in GitHub.
 
+See [RELEASING.md](./RELEASING.md) for the complete release runbook, Trusted
+Publisher identity, verification commands, and failure recovery.
+
 ## Support and security
 
 Report reproducible SDK bugs through the
