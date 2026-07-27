@@ -108,6 +108,8 @@ describe("React account UI", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Sessions" })[0]!);
     expect(await screen.findByText("Safari on iPhone")).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: "Sign out" }).at(-1)!);
+    expect(screen.getByText("Sign out Safari on iPhone?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm sign out" }));
     expect((await screen.findByRole("status")).textContent).toContain("Session signed out.");
     await waitFor(() => expect(screen.queryByText("Safari on iPhone")).toBeNull());
   });

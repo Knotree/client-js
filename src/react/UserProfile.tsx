@@ -52,7 +52,11 @@ export function UserProfile({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [confirm, setConfirm] = useState<"all" | "others" | null>(null);
+  const [confirm, setConfirm] = useState<{
+    mode: "one" | "all" | "others";
+    displayId?: string;
+    device?: string;
+  } | null>(null);
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -245,6 +249,9 @@ export function UserProfile({
                   <div className="kt-field"><label htmlFor={`${titleId}-username`}>Username</label><input className="kt-input" id={`${titleId}-username`} autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
                   <div className="kt-field"><label htmlFor={`${titleId}-email`}>Email address</label><input className="kt-input" id={`${titleId}-email`} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
                 </div>
+                <p className="kt-section-copy" style={{ marginTop: 14 }}>
+                  Member since {formatDate(session.user.created_at)}
+                </p>
                 <div className="kt-actions"><button className="kt-button kt-primary" disabled={busy === "profile"}>{busy === "profile" ? "Saving…" : "Save changes"}</button></div>
               </div>
             </form>
@@ -276,7 +283,7 @@ export function UserProfile({
                         <div className="kt-session-name">{item.device || "Unknown device"}{item.current && <span className="kt-current">Current</span>}</div>
                         <div className="kt-session-meta">{item.application ? `${item.application} · ` : ""}Last active {formatDate(item.last_active_at)}{item.network_hint ? ` · ${item.network_hint}` : ""}</div>
                       </div>
-                      {!item.current && <button type="button" className="kt-link-button" disabled={busy !== null} onClick={() => void revoke("one", item.display_id)}>Sign out</button>}
+                      {!item.current && <button type="button" className="kt-link-button" disabled={busy !== null} onClick={() => setConfirm({ mode: "one", displayId: item.display_id, device: item.device })}>Sign out</button>}
                     </div>
                   ))}
                 </div>
@@ -284,10 +291,10 @@ export function UserProfile({
               <section className="kt-section">
                 <div className="kt-section-head"><h3 className="kt-section-title">Session controls</h3><p className="kt-section-copy">You can sign out other devices or end every active session.</p></div>
                 <div className="kt-section-body"><div className="kt-actions">
-                  <button type="button" className="kt-button kt-danger-button" onClick={() => setConfirm("all")}>Sign out everywhere</button>
-                  <button type="button" className="kt-button kt-secondary" onClick={() => setConfirm("others")}>Sign out other devices</button>
+                  <button type="button" className="kt-button kt-danger-button" onClick={() => setConfirm({ mode: "all" })}>Sign out everywhere</button>
+                  <button type="button" className="kt-button kt-secondary" onClick={() => setConfirm({ mode: "others" })}>Sign out other devices</button>
                 </div></div>
-                {confirm && <div className="kt-confirm"><strong>{confirm === "all" ? "Sign out everywhere?" : "Sign out other devices?"}</strong><p>{confirm === "all" ? "This also ends the session on this device." : "Your current session will remain active."}</p><div className="kt-confirm-actions"><button type="button" className="kt-button kt-secondary" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className="kt-button kt-danger-button" disabled={busy !== null} onClick={() => void revoke(confirm)}>Confirm sign out</button></div></div>}
+                {confirm && <div className="kt-confirm"><strong>{confirm.mode === "all" ? "Sign out everywhere?" : confirm.mode === "others" ? "Sign out other devices?" : `Sign out ${confirm.device || "this device"}?`}</strong><p>{confirm.mode === "all" ? "This also ends the session on this device." : "Your current session will remain active."}</p><div className="kt-confirm-actions"><button type="button" className="kt-button kt-secondary" onClick={() => setConfirm(null)}>Cancel</button><button type="button" className="kt-button kt-danger-button" disabled={busy !== null} onClick={() => void revoke(confirm.mode, confirm.displayId)}>Confirm sign out</button></div></div>}
               </section>
             </>
           )}
