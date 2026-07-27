@@ -19,6 +19,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./react-router": {
+      "types": "./dist/react-router/index.d.ts",
+      "import": "./dist/react-router/index.js"
     }
   },
   "sideEffects": false,
@@ -53,7 +61,24 @@
   "author": "Knotree",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "jsdom": "^26.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "7.18.1",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
+  },
+  "peerDependencies": {
+    "react": ">=18 <20",
+    "react-dom": ">=18 <20",
+    "react-router-dom": ">=6 <8"
+  },
+  "peerDependenciesMeta": {
+    "react-router-dom": {
+      "optional": true
+    }
   }
 }
