@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.0 — 2026-07-27
+
+- Add an all-in-one React account UI to the existing package through
+  `@knotree/client/react` and `@knotree/client/react-router`.
+- Add `KnotreeProvider`, `KnotreeRouterProvider`, `UserButton`, `UserProfile`,
+  and `useKnotree` without requiring a profile route or separate Knotree
+  package.
+- Include responsive desktop dialog and mobile bottom-sheet layouts, built-in
+  styling and theme tokens, keyboard focus handling, reduced motion, profile
+  editing, password change, session management, and confirmed destructive
+  actions.
+- Keep React and React Router as peer dependencies so consuming applications
+  retain a single framework runtime; the framework-free root SDK remains
+  isolated from UI imports.
+- Add React DOM integration tests, a production-buildable React Router example,
+  and packed-consumer checks for all public subpath exports.
+
 ## 0.1.6 — 2026-07-27
 
 - Preserve the Hosted Auth Application client id with persisted SSO sessions.
