@@ -1,6 +1,14 @@
+import { webcrypto } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { createClient } from "./client.js";
 import { MemoryStorage } from "./storage.js";
+
+if (!globalThis.crypto) {
+  Object.defineProperty(globalThis, "crypto", {
+    configurable: true,
+    value: webcrypto,
+  });
+}
 
 const user = {
   id: "user-1",
