@@ -198,11 +198,15 @@ if (result.error) {
 
 The callback validates stored state, consumes the transaction before exchange,
 removes code/state/error parameters from browser history, exchanges with the
-public client id and PKCE verifier, and persists the normal TinyBase session.
+public client id and PKCE verifier, and persists the TinyBase session together
+with its Hosted Auth Application context. Sessions requesting `offline_access`
+automatically rotate through `/oauth/token` after reload; direct password
+sessions continue to use `/v1/auth/refresh`. `auth.signOut()` likewise revokes
+the current Hosted Auth Application session through `/oauth/revoke`.
 Google authentication still returns through this callback and never bypasses
-the Hosted Portal consent page. `auth.signOut()` remains the normal logout;
-`auth.revokeToken(token, clientId)` explicitly revokes an OAuth refresh/access
-credential. No client secret is accepted by these APIs.
+the Hosted Portal consent page. `auth.revokeToken(token, clientId)` remains
+available for explicit OAuth credential revocation. No client secret is
+accepted by these APIs.
 
 Existing `signIn`/`signUp` password calls are unchanged. Apps migrating to
 redirect auth should register their exact production callbacks,

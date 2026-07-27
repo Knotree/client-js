@@ -31,6 +31,8 @@ export type Session = {
   user: AppUser;
   /** Absolute expiry time (ms since epoch) for the access token. */
   expires_at?: number;
+  /** OAuth Application client id when the session came from Hosted Auth. */
+  oauth_client_id?: string;
 };
 
 export type AuthChangeEvent =

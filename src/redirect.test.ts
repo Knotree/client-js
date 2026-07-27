@@ -67,6 +67,7 @@ describe("redirect authentication", () => {
       replaceHistory: (value) => replaced.push(value),
     });
     expect(callback.data?.user).toEqual(user);
+    expect(callback.data?.oauth_client_id).toBe("client-1");
     expect(replaced[0]).not.toContain("code=");
     expect(replaced[0]).not.toContain("state=");
     expect(String(fetcher.mock.calls[0][0])).toContain("/oauth/token");
@@ -75,6 +76,170 @@ describe("redirect authentication", () => {
       replaceHistory: () => undefined,
     });
     expect(replay.error?.code).toBe("REDIRECT_STATE_MISMATCH");
+  });
+
+  it("restores an expired Hosted Auth session and rotates it through the OAuth refresh grant", async () => {
+    const storage = new MemoryStorage();
+    await storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify({
+        access_token: "expired-access",
+        refresh_token: "oauth-refresh-1",
+        token_type: "Bearer",
+        expires_in: 900,
+        expires_at: Date.now() - 1_000,
+        oauth_client_id: "client-1",
+        user,
+      }),
+    );
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          access_token: "fresh-access",
+          refresh_token: "oauth-refresh-2",
+          token_type: "Bearer",
+          expires_in: 900,
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = createClient({
+      url: "https://api.example.com",
+      projectKey: "pk",
+      storage,
+      fetch: fetcher as typeof fetch,
+    });
+
+    await client.auth.initialize();
+
+    expect(client.auth.getSession()).toMatchObject({
+      access_token: "fresh-access",
+      refresh_token: "oauth-refresh-2",
+      oauth_client_id: "client-1",
+      user,
+    });
+    const [url, init] = fetcher.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("https://api.example.com/oauth/token");
+    expect(init.method).toBe("POST");
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get("grant_type")).toBe("refresh_token");
+    expect(body.get("client_id")).toBe("client-1");
+    expect(body.get("refresh_token")).toBe("oauth-refresh-1");
+  });
+
+  it("revokes a Hosted Auth refresh token through the matching Application on sign-out", async () => {
+    const storage = new MemoryStorage();
+    await storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify({
+        access_token: "access",
+        refresh_token: "oauth-refresh",
+        token_type: "Bearer",
+        expires_in: 900,
+        expires_at: Date.now() + 900_000,
+        oauth_client_id: "client-1",
+        user,
+      }),
+    );
+    const fetcher = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = createClient({
+      url: "https://api.example.com",
+      projectKey: "pk",
+      storage,
+      fetch: fetcher as typeof fetch,
+    });
+    await client.auth.initialize();
+
+    const result = await client.auth.signOut();
+
+    expect(result.error).toBeNull();
+    expect(client.auth.getSession()).toBeNull();
+    const [url, init] = fetcher.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("https://api.example.com/oauth/revoke");
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get("client_id")).toBe("client-1");
+    expect(body.get("token")).toBe("oauth-refresh");
+  });
+
+  it("restores a still-valid Hosted Auth access-only session without forcing a new login", async () => {
+    const storage = new MemoryStorage();
+    await storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify({
+        access_token: "access-only",
+        refresh_token: "",
+        token_type: "Bearer",
+        expires_in: 900,
+        expires_at: Date.now() + 900_000,
+        oauth_client_id: "client-1",
+        user,
+      }),
+    );
+    const fetcher = vi.fn();
+    const client = createClient({
+      url: "https://api.example.com",
+      projectKey: "pk",
+      storage,
+      fetch: fetcher as typeof fetch,
+    });
+
+    await client.auth.initialize();
+
+    expect(client.auth.getAccessToken()).toBe("access-only");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("coalesces simultaneous Hosted Auth refreshes so a rotating token is used once", async () => {
+    const storage = new MemoryStorage();
+    await storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify({
+        access_token: "access",
+        refresh_token: "oauth-refresh-1",
+        token_type: "Bearer",
+        expires_in: 900,
+        expires_at: Date.now() + 900_000,
+        oauth_client_id: "client-1",
+        user,
+      }),
+    );
+    let resolveResponse!: (response: Response) => void;
+    const pendingResponse = new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    });
+    const fetcher = vi.fn(async () => pendingResponse);
+    const client = createClient({
+      url: "https://api.example.com",
+      projectKey: "pk",
+      storage,
+      fetch: fetcher as typeof fetch,
+    });
+    await client.auth.initialize();
+
+    const first = client.auth.refreshSession();
+    const second = client.auth.refreshSession();
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    resolveResponse(
+      new Response(
+        JSON.stringify({
+          access_token: "fresh-access",
+          refresh_token: "oauth-refresh-2",
+          token_type: "Bearer",
+          expires_in: 900,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    expect((await first).data?.access_token).toBe("fresh-access");
+    expect((await second).data?.access_token).toBe("fresh-access");
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("keeps simultaneous attempts transaction-scoped and rejects unknown state", async () => {

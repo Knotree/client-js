@@ -27,6 +27,7 @@ export class AuthClient {
   private persist: boolean;
   private autoRefresh: boolean;
   private ready: Promise<void>;
+  private refreshInFlight: Promise<Result<Session>> | null = null;
 
   constructor(
     private readonly options: ResolvedClientOptions,
@@ -228,21 +229,24 @@ export class AuthClient {
         refresh_token?: string;
         token_type?: string;
         expires_in?: number;
-        error?: { code: string; message: string };
+        error?: string | { code: string; message: string };
+        error_description?: string;
       };
       if (!response.ok || !payload.access_token)
         return {
           data: null,
-          error: payload.error ?? {
-            code: "REDIRECT_EXCHANGE_FAILED",
-            message: "authorization code exchange failed",
-          },
+          error: oauthResponseError(
+            payload,
+            "REDIRECT_EXCHANGE_FAILED",
+            "authorization code exchange failed",
+          ),
         };
       const provisional: Session = {
         access_token: payload.access_token,
         refresh_token: payload.refresh_token ?? "",
         token_type: payload.token_type ?? "Bearer",
         expires_in: payload.expires_in ?? 900,
+        oauth_client_id: record.clientId,
         user: {
           id: "",
           email: null,
@@ -292,20 +296,28 @@ export class AuthClient {
   async signOut(): Promise<Result<{ status: string }>> {
     await this.ready;
     const refresh = this.session?.refresh_token;
+    const oauthClientId = this.session?.oauth_client_id;
     let result: Result<{ status: string }> = {
       data: { status: "signed_out" },
       error: null,
     };
     if (refresh) {
-      result = await request<{ status: string }>(
-        this.ctx(),
-        "POST",
-        "/v1/auth/signout",
-        {
-          body: { refresh_token: refresh },
-          auth: false,
-        },
-      );
+      if (oauthClientId) {
+        result = await this.revokeToken(refresh, oauthClientId);
+        if (result.data) {
+          result = { data: { status: "signed_out" }, error: null };
+        }
+      } else {
+        result = await request<{ status: string }>(
+          this.ctx(),
+          "POST",
+          "/v1/auth/signout",
+          {
+            body: { refresh_token: refresh },
+            auth: false,
+          },
+        );
+      }
     }
     await this.clearSession("SIGNED_OUT");
     return result;
@@ -423,27 +435,100 @@ export class AuthClient {
 
   async refreshSession(): Promise<Result<Session>> {
     await this.ready;
+    return this.refreshSessionInternal();
+  }
+
+  private refreshSessionInternal(): Promise<Result<Session>> {
+    if (this.refreshInFlight) {
+      return this.refreshInFlight;
+    }
+    const refresh = this.performRefresh();
+    this.refreshInFlight = refresh;
+    void refresh.finally(() => {
+      if (this.refreshInFlight === refresh) {
+        this.refreshInFlight = null;
+      }
+    });
+    return refresh;
+  }
+
+  private async performRefresh(): Promise<Result<Session>> {
     if (!this.session?.refresh_token) {
       return {
         data: null,
         error: { code: "AUTH_REQUIRED", message: "no refresh token" },
       };
     }
-    const result = await request<Session>(
-      this.ctx(),
-      "POST",
-      "/v1/auth/refresh",
-      {
-        body: { refresh_token: this.session.refresh_token },
-        auth: false,
-      },
-    );
+    const current = this.session;
+    const result = current.oauth_client_id
+      ? await this.refreshHostedSession(current)
+      : await request<Session>(this.ctx(), "POST", "/v1/auth/refresh", {
+          body: { refresh_token: current.refresh_token },
+          auth: false,
+        });
     if (result.data) {
       await this.setSession(result.data, "TOKEN_REFRESHED");
     } else {
       await this.clearSession("SIGNED_OUT");
     }
     return result;
+  }
+
+  private async refreshHostedSession(
+    current: Session,
+  ): Promise<Result<Session>> {
+    const fetcher = this.options.fetch ?? fetch;
+    try {
+      const response = await fetcher(
+        `${this.options.url.replace(/\/$/, "")}/oauth/token`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            client_id: current.oauth_client_id!,
+            refresh_token: current.refresh_token,
+          }),
+        },
+      );
+      const payload = (await response.json()) as {
+        access_token?: string;
+        refresh_token?: string;
+        token_type?: string;
+        expires_in?: number;
+        error?: string | { code: string; message: string };
+        error_description?: string;
+      };
+      if (!response.ok || !payload.access_token) {
+        return {
+          data: null,
+          error: oauthResponseError(
+            payload,
+            "TOKEN_REFRESH_FAILED",
+            "Hosted Auth token refresh failed",
+          ),
+        };
+      }
+      return {
+        data: {
+          access_token: payload.access_token,
+          refresh_token: payload.refresh_token ?? current.refresh_token,
+          token_type: payload.token_type ?? current.token_type,
+          expires_in: payload.expires_in ?? current.expires_in,
+          user: current.user,
+          oauth_client_id: current.oauth_client_id,
+        },
+        error: null,
+      };
+    } catch {
+      return {
+        data: null,
+        error: {
+          code: "TOKEN_REFRESH_FAILED",
+          message: "Hosted Auth token refresh failed",
+        },
+      };
+    }
   }
 
   /** Called by HTTP layer on 401 to attempt a single refresh. */
@@ -462,14 +547,18 @@ export class AuthClient {
         return;
       }
       const session = JSON.parse(raw) as Session;
-      if (!session.access_token || !session.refresh_token) {
+      if (!session.access_token) {
         return;
       }
       this.session = normalizeSession(session);
       this.scheduleRefresh();
       // If expired, try refresh immediately.
       if (this.isExpired(this.session)) {
-        await this.refreshSession();
+        if (this.session.refresh_token) {
+          await this.refreshSessionInternal();
+        } else {
+          await this.clearSession("SIGNED_OUT");
+        }
       }
     } catch {
       // ignore corrupt storage
@@ -567,6 +656,23 @@ function normalizeSession(session: Session): Session {
   const expires_at =
     session.expires_at ?? Date.now() + (session.expires_in ?? 900) * 1000;
   return { ...session, expires_at };
+}
+
+function oauthResponseError(
+  payload: {
+    error?: string | { code: string; message: string };
+    error_description?: string;
+  },
+  fallbackCode: string,
+  fallbackMessage: string,
+) {
+  if (payload.error && typeof payload.error === "object") {
+    return payload.error;
+  }
+  return {
+    code: payload.error ?? fallbackCode,
+    message: payload.error_description ?? fallbackMessage,
+  };
 }
 
 function createFallbackStorage(): AuthStorage {
