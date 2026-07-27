@@ -1,6 +1,6 @@
 {
   "name": "@knotree/client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TinyBase JavaScript/TypeScript client for browser and Node.js",
   "keywords": [
     "tinybase",
@@ -23,7 +23,8 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
@@ -49,7 +50,7 @@
     "url": "https://github.com/Knotree/client-js/issues"
   },
   "author": "Knotree",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "devDependencies": {
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"

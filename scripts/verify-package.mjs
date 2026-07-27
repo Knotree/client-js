@@ -27,6 +27,7 @@ try {
 
   for (const requiredPath of [
     "LICENSE",
+    "NOTICE",
     "README.md",
     "dist/index.js",
     "dist/index.d.ts",

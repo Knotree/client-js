@@ -3,7 +3,7 @@
 TypeScript client for the TinyBase Backend-as-a-Service API (browser and Node.js 18+).
 
 [Repository](https://github.com/Knotree/client-js) ·
-[Issues](https://github.com/Knotree/client-js/issues) · MIT license
+[Issues](https://github.com/Knotree/client-js/issues) · Apache-2.0 license
 
 ## Install
 
