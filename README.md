@@ -113,8 +113,19 @@ npm run verify:package
 
 `verify:package` builds the exact npm tarball, checks its required files,
 installs it into a temporary consumer project, and verifies the public runtime
-exports. Publishing is intentionally separate and requires an npm account with
-permission to the `@knotree` scope.
+exports.
+
+## Release
+
+Releases are published by GitHub Actions through npm Trusted Publishing:
+
+1. Update `version` and `CHANGELOG.md` in a pull request.
+2. Merge only after the CI matrix succeeds on Node.js 18, 20, 22, and 24.
+3. Create and publish a GitHub Release whose tag is exactly `v<version>`.
+4. The `publish.yml` workflow repeats all gates, verifies release identity,
+   publishes through short-lived OIDC credentials, and records npm provenance.
+
+No npm write token is stored in GitHub.
 
 ## Support and security
 

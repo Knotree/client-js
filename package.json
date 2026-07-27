@@ -33,7 +33,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepack": "npm run clean && npm run build",
-    "verify:package": "node ./scripts/verify-package.mjs"
+    "verify:package": "node ./scripts/verify-package.mjs",
+    "verify:release": "node ./scripts/verify-release.mjs"
   },
   "engines": {
     "node": ">=18"
