@@ -5,7 +5,7 @@ import type {
   AuthChangeEvent,
   AuthStorage,
   ChangePasswordInput,
-  ClientOptions,
+  ResolvedClientOptions,
   Result,
   RedirectCallbackOptions,
   RedirectSignInOptions,
@@ -29,7 +29,7 @@ export class AuthClient {
   private ready: Promise<void>;
 
   constructor(
-    private readonly options: ClientOptions,
+    private readonly options: ResolvedClientOptions,
     private readonly getRequestContext: () => RequestContext,
   ) {
     this.storage = options.storage ?? createFallbackStorage();

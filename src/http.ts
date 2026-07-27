@@ -1,7 +1,7 @@
-import type { ApiError, ApiResponse, ClientOptions, Result } from "./types.js";
+import type { ApiError, ApiResponse, ResolvedClientOptions, Result } from "./types.js";
 
 export type RequestContext = {
-  options: ClientOptions;
+  options: ResolvedClientOptions;
   getAccessToken: () => string | null;
   onUnauthorized?: () => Promise<string | null>;
 };

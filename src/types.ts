@@ -46,7 +46,8 @@ export type AuthStorage = {
 };
 
 export type ClientOptions = {
-  url: string;
+  /** API base URL. Default: https://tinybaseapis.knotree.com */
+  url?: string;
   projectKey: string;
   fetch?: typeof fetch;
   storage?: AuthStorage;
@@ -56,6 +57,11 @@ export type ClientOptions = {
   storageKey?: string;
   headers?: Record<string, string>;
   portalBaseUrl?: string;
+};
+
+/** Fully normalized client configuration used after construction. */
+export type ResolvedClientOptions = Omit<ClientOptions, "url"> & {
+  url: string;
 };
 
 export type RedirectSignInOptions = {

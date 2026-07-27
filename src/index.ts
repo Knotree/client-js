@@ -1,4 +1,4 @@
-export { createClient, TinyBaseClient } from "./client.js";
+export { createClient, DEFAULT_API_URL, TinyBaseClient } from "./client.js";
 export { AuthClient } from "./auth.js";
 export { EdgeFunctionsClient } from "./functions.js";
 export { QueryBuilder } from "./query.js";

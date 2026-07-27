@@ -20,14 +20,13 @@ Use Node.js 18 or newer, or a modern browser bundler.
 import { createClient } from "@knotree/client";
 
 const tinybase = createClient({
-  url: "http://localhost:4000",
-  projectKey: "tb_pk_local_xxx",
+  projectKey: "tb_pk_your_project_key",
 });
 
 // Auth
 const { data: session, error } = await tinybase.auth.signUp({
-  email: "user@example.com",
-  password: "password123",
+  email,
+  password,
 });
 
 // Data
@@ -67,14 +66,14 @@ type Database = {
   };
 };
 
-const tinybase = createClient<Database>({ url, projectKey });
+const tinybase = createClient<Database>({ projectKey });
 ```
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `url` | required | API base URL |
+| `url` | `https://tinybaseapis.knotree.com` | Override only for a self-hosted API |
 | `projectKey` | required | Public/anon project key (`tb_pk_*`); never a service key |
 | `fetch` | `globalThis.fetch` | Custom fetch implementation |
 | `storage` | `localStorage` or memory | Session persistence |
@@ -115,7 +114,7 @@ npm run verify:package
 `verify:package` builds the exact npm tarball, checks its required files,
 installs it into a temporary consumer project, and verifies the public runtime
 exports. Publishing is intentionally separate and requires an npm account with
-permission to the `@tinybase` scope.
+permission to the `@knotree` scope.
 
 ## Support and security
 
@@ -134,7 +133,7 @@ PKCE S256 values and stores each attempt separately:
 ```ts
 const started = await tb.auth.signInWithRedirect({
   clientId: "tb_app_...",
-  redirectUri: "http://localhost:5173/auth/callback", // production: exact HTTPS URL
+  redirectUri: `${window.location.origin}/auth/callback`,
   scopes: ["profile", "email", "offline_access"],
 });
 if (started.data) window.location.assign(started.data.url);
@@ -158,7 +157,7 @@ the Hosted Portal consent page. `auth.signOut()` remains the normal logout;
 credential. No client secret is accepted by these APIs.
 
 Existing `signIn`/`signUp` password calls are unchanged. Apps migrating to
-redirect auth should add their exact localhost and production callbacks,
+redirect auth should register their exact production callbacks,
 configure CORS independently, handle typed callback errors, and avoid starting
 redirect auth where storage is blocked—the SDK fails closed rather than
 accepting an uncorrelated code.

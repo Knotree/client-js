@@ -10,6 +10,25 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("query builder", () => {
+  it("uses the production API by default", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe("https://tinybaseapis.knotree.com/v1/data/todos");
+      return jsonResponse({ data: [], error: null, meta: { request_id: "r-prod" } });
+    });
+
+    const client = createClient({
+      projectKey: "tb_pk_production_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage: new MemoryStorage(),
+      persistSession: false,
+      autoRefreshToken: false,
+    });
+
+    const { error } = await client.from("todos").select();
+    expect(error).toBeNull();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("builds select with filters order limit", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

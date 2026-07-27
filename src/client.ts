@@ -9,22 +9,22 @@ import {
 } from "./query.js";
 import { createDefaultStorage } from "./storage.js";
 import { EdgeFunctionsClient } from "./functions.js";
-import type { ClientOptions, GenericDatabase } from "./types.js";
+import type { ClientOptions, GenericDatabase, ResolvedClientOptions } from "./types.js";
+
+export const DEFAULT_API_URL = "https://tinybaseapis.knotree.com";
 
 export class TinyBaseClient<DB extends GenericDatabase = GenericDatabase> {
   readonly auth: AuthClient;
   readonly functions: EdgeFunctionsClient;
-  private readonly options: ClientOptions;
+  private readonly options: ResolvedClientOptions;
 
   constructor(options: ClientOptions) {
-    if (!options.url) {
-      throw new Error("ClientOptions.url is required");
-    }
     if (!options.projectKey) {
       throw new Error("ClientOptions.projectKey is required");
     }
     this.options = {
       ...options,
+      url: options.url || DEFAULT_API_URL,
       storage: options.storage ?? createDefaultStorage(),
       autoRefreshToken: options.autoRefreshToken !== false,
       persistSession: options.persistSession !== false,

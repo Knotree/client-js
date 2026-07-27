@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3 — 2026-07-27
+
+- Default the SDK API base URL to the production deployment at
+  `https://tinybaseapis.knotree.com`.
+- Make `ClientOptions.url` optional while preserving explicit self-hosted
+  overrides.
+- Replace local/example values in public setup documentation with production
+  configuration.
+
 ## 0.1.2 — 2026-07-27
 
 - Change the project and npm package license from MIT to Apache-2.0.
