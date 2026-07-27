@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.6 — 2026-07-27
+
+- Preserve the Hosted Auth Application client id with persisted SSO sessions.
+- Refresh SSO sessions through the OAuth `refresh_token` grant and revoke them
+  through the matching Application endpoint instead of using direct-auth
+  methods.
+- Fix expired-session restoration deadlocking while it waited on its own
+  initialization.
+- Coalesce concurrent refresh attempts so rotating refresh tokens are submitted
+  only once, and retain still-valid access-only sessions across reloads.
+
 ## 0.1.5 — 2026-07-27
 
 - Fix `insert().select()`, `update().select()`, and `delete().select()` so
