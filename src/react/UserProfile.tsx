@@ -126,11 +126,19 @@ export function UserProfile({
   const saveProfile = async (event: FormEvent) => {
     event.preventDefault();
     clearNotice();
+    const input: { username?: string; email?: string } = {};
+    const nextUsername = username.trim();
+    const nextEmail = email.trim();
+    if (nextUsername && nextUsername !== (session.user.username ?? ""))
+      input.username = nextUsername;
+    if (nextEmail && nextEmail !== (session.user.email ?? ""))
+      input.email = nextEmail;
+    if (!input.username && !input.email) {
+      setSuccess("Your profile is already up to date.");
+      return;
+    }
     setBusy("profile");
-    const result = await client.auth.updateUser({
-      username: username.trim(),
-      email: email.trim(),
-    });
+    const result = await client.auth.updateUser(input);
     setBusy(null);
     result.data ? setSuccess("Profile updated.") : setError(message(result.error));
   };

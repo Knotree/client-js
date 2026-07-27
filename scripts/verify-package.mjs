@@ -31,6 +31,10 @@ try {
     "README.md",
     "dist/index.js",
     "dist/index.d.ts",
+    "dist/react/index.js",
+    "dist/react/index.d.ts",
+    "dist/react-router/index.js",
+    "dist/react-router/index.d.ts",
     "package.json",
   ]) {
     if (!includedPaths.has(requiredPath)) {
@@ -43,13 +47,22 @@ try {
     ["install", "--ignore-scripts", "--no-audit", "--no-fund", join(temporaryDir, filename)],
     { cwd: temporaryDir, stdio: "inherit" },
   );
+  runNpm(
+    ["install", "--ignore-scripts", "--no-audit", "--no-fund", "react-router-dom@6.30.3"],
+    { cwd: temporaryDir, stdio: "inherit" },
+  );
 
   writeFileSync(
     join(temporaryDir, "consumer.mjs"),
     [
       'import { createClient, MemoryStorage } from "@knotree/client";',
+      'import { KnotreeProvider, UserButton } from "@knotree/client/react";',
+      'import { KnotreeRouterProvider } from "@knotree/client/react-router";',
       'if (typeof createClient !== "function") throw new Error("createClient export missing");',
       'if (typeof MemoryStorage !== "function") throw new Error("MemoryStorage export missing");',
+      'if (typeof KnotreeProvider !== "function") throw new Error("KnotreeProvider export missing");',
+      'if (typeof UserButton !== "function") throw new Error("UserButton export missing");',
+      'if (typeof KnotreeRouterProvider !== "function") throw new Error("KnotreeRouterProvider export missing");',
       'console.log("@knotree/client packed artifact imports successfully");',
       "",
     ].join("\n"),

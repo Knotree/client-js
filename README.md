@@ -14,6 +14,70 @@ npm install @knotree/client
 The package is ESM-only and includes TypeScript declarations and source maps.
 Use Node.js 18 or newer, or a modern browser bundler.
 
+## React account UI
+
+React applications can add a complete account experience without installing a
+second Knotree package or creating a profile route. The first UI release
+supports React 18/19 and React Router 6/7:
+
+```tsx
+import { createClient } from "@knotree/client";
+import {
+  KnotreeRouterProvider,
+  UserButton,
+} from "@knotree/client/react-router";
+
+const tinybase = createClient({
+  projectKey: "tb_pk_your_project_key",
+});
+
+export function App() {
+  return (
+    <KnotreeRouterProvider
+      client={tinybase}
+      afterSignOutPath="/sign-in"
+      appearance={{ accentColor: "#635bff", borderRadius: 20 }}
+    >
+      <header>
+        <UserButton />
+      </header>
+      <AppRoutes />
+    </KnotreeRouterProvider>
+  );
+}
+```
+
+`UserButton` renders the current user's avatar/name and opens a route-free,
+responsive account dialog. The dialog includes profile editing, password
+change, device/session review, per-device revocation, sign-out-other-devices,
+sign-out-everywhere, loading/error/confirmation states, keyboard focus
+management, Escape/backdrop close, reduced-motion support, and a mobile bottom
+sheet layout. Styles are injected once, so no CSS import is required.
+
+`KnotreeRouterProvider` must be inside the application's router. It navigates to
+`afterSignOutPath` after sign-out or a successful password change. Applications
+that do not want router-driven navigation can use the React-only entry:
+
+```tsx
+import {
+  KnotreeProvider,
+  UserButton,
+  useKnotree,
+} from "@knotree/client/react";
+
+<KnotreeProvider client={tinybase} onAfterSignOut={() => location.assign("/sign-in")}>
+  <UserButton />
+</KnotreeProvider>;
+
+// A custom trigger can call:
+const { openUserProfile } = useKnotree();
+openUserProfile("sessions");
+```
+
+React, React DOM, and React Router remain peer dependencies, preventing a
+second React runtime from being bundled. The non-React SDK stays available from
+the root `@knotree/client` export without importing UI code.
+
 ## Quick start
 
 ```ts
