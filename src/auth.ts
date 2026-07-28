@@ -22,6 +22,11 @@ import type {
 
 type Listener = (event: AuthChangeEvent, session: Session | null) => void;
 
+/** Minimal Web Locks API surface used for cross-tab refresh serialization. */
+type WebLocksManagerLike = {
+  request(name: string, callback: () => Promise<unknown>): Promise<unknown>;
+};
+
 export class AuthClient {
   private session: Session | null = null;
   private listeners = new Set<Listener>();
@@ -556,7 +561,12 @@ export class AuthClient {
     if (this.refreshInFlight) {
       return this.refreshInFlight;
     }
-    const refresh = this.performRefresh();
+    // Serialize refresh across browser tabs via the Web Locks API so two tabs
+    // never present the same (already-rotated) refresh token to the backend,
+    // which would trigger reuse detection and revoke the whole session family
+    // (D-0074). Falls back to in-tab single-flight when Web Locks is unavailable
+    // (Node.js, jsdom, older browsers).
+    const refresh = this.withCrossTabRefreshLock(() => this.performRefresh());
     this.refreshInFlight = refresh;
     void refresh.finally(() => {
       if (this.refreshInFlight === refresh) {
@@ -566,7 +576,25 @@ export class AuthClient {
     return refresh;
   }
 
+  private withCrossTabRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+    const nav = (
+      globalThis as { navigator?: { locks?: WebLocksManagerLike } }
+    ).navigator;
+    if (nav?.locks && typeof nav.locks.request === "function") {
+      return nav.locks.request("tinybase-auth-refresh", () => fn()) as Promise<T>;
+    }
+    return fn();
+  }
+
   private async performRefresh(): Promise<Result<Session>> {
+    // Re-read the latest persisted session in case another tab rotated the
+    // refresh token while this tab waited for the Web Lock or in-tab
+    // single-flight (D-0074). If a fresh, rotated session is now present,
+    // adopt it instead of POSTing a stale refresh token.
+    const previousToken = this.session?.access_token ?? null;
+    if (await this.maybeAdoptRotatedSession(previousToken)) {
+      return { data: this.session, error: null };
+    }
     if (!this.session?.refresh_token) {
       return {
         data: null,
@@ -600,12 +628,70 @@ export class AuthClient {
       await this.setSession(result.data, "TOKEN_REFRESHED");
       return result;
     }
+    // Grace retry on reuse detection (D-0074): a concurrent tab likely rotated
+    // the refresh token, so this tab presented a now-rotated token. Re-read
+    // storage once before clearing; if a fresh rotated session is present,
+    // adopt it instead of signing the user out.
+    if (result.error?.code === "REFRESH_TOKEN_REUSED") {
+      if (await this.maybeAdoptRotatedSession(current.access_token)) {
+        return { data: this.session, error: null };
+      }
+    }
     // Clear only on definitive auth failure (invalid/revoked grant), not on
     // transient 5xx/network/rate-limit responses (D-0073).
     if (result.error && isDefinitiveAuthFailure(result.error.code)) {
       await this.clearSession("SIGNED_OUT");
     }
     return result;
+  }
+
+  /**
+   * Read and normalize the latest persisted session from storage (or the
+   * in-memory session when persistence is disabled).
+   */
+  private async readLatestSession(): Promise<Session | null> {
+    if (!this.persist) {
+      return this.session ? normalizeSession(this.session) : null;
+    }
+    try {
+      const raw = await this.storage.getItem(this.storageKey);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw) as Session;
+      if (!parsed.access_token) {
+        return null;
+      }
+      return normalizeSession(parsed);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Adopt a session that another tab rotated (different, non-expired access
+   * token) instead of POSTing a stale refresh token. Returns true when the
+   * in-memory session was replaced and no network refresh is needed.
+   */
+  private async maybeAdoptRotatedSession(
+    previousToken: string | null,
+  ): Promise<boolean> {
+    if (!previousToken) {
+      return false;
+    }
+    const latest = await this.readLatestSession();
+    if (
+      !latest ||
+      !latest.access_token ||
+      latest.access_token === previousToken ||
+      this.isExpired(latest)
+    ) {
+      return false;
+    }
+    this.session = latest;
+    this.scheduleRefresh();
+    this.emit("TOKEN_REFRESHED", this.session);
+    return true;
   }
 
   private async refreshHostedSession(
