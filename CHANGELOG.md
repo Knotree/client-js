@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.5.0 — 2026-07-28
+
+- **Account popup redesign** with a calm, hairline-driven visual language
+  grounded in the host's identity (warm paper canvas, solid indigo accent,
+  DM Sans → Inter stack). Removes gradient washes, decorative circles,
+  hover lifts, and the close-button spin.
+- **First-class light and dark themes.** `data-mode="light"` and
+  `data-mode="dark"` force a side; the default `"auto"` follows the user's
+  OS via `prefers-color-scheme`. Hosts can match their site theme via
+  `appearance={{ mode: "dark" }}`. Backdrop dims deeper in dark mode
+  automatically.
+- **Signature nav marker.** Active sidebar navigation uses a 2px accent
+  hairline at the left edge with no background fill (reads like a
+  code-editor tab marker). On mobile, the sidebar collapses to a
+  horizontal scroll strip with a soft accent pill for the active item.
+- **Monospace OTP inputs** with tabular figures, so the 6-digit
+  verification code reads like code. Inline code hints (`<code>`) adopt
+  the same monospace stack.
+- **Typographic account hub hero.** Replaces the gradient hero with a
+  quiet recessed surface; stats sit behind hairline dividers instead of
+  glowing on color. Verified badge and "Current session" pill keep their
+  meaning without the maximalist treatment.
+- **Opinionated dark-mode primary button.** Uses dark ink on light indigo
+  (`#8b8bff` / `#0e0e10`) instead of the default white-on-color.
+- **Refined inputs, buttons, sections, sessions, toasts, skeletons, and
+  confirm dialogs.** Hairline borders and quiet recessed surfaces
+  (`--kt-bg-soft`) carry the structure. Focus rings use a 2px accent
+  outline; `prefers-reduced-motion` and sticky header behavior are
+  preserved.
+- **Tighter responsive breakpoints**, including a new `≤400px` step for
+  OTP and stat spacing. The mobile bottom-sheet pattern (sidebar →
+  horizontal strip, stacked hero, single-column hub, full-width auth
+  sheet) is preserved.
+- No public API changes. Class names, `--kt-*` token names,
+  `appearanceStyle`, and the `data-mode` mechanism are unchanged, so
+  existing `KnotreeAppearance` overrides and tests continue to work.
+
 ## 0.4.0 — 2026-07-28
 
 - **Account popup UI/UX overhaul** with a new "Overview" hub landing

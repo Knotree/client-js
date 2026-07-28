@@ -1,6 +1,6 @@
 {
   "name": "@knotree/client",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "TinyBase JavaScript/TypeScript client for browser and Node.js",
   "keywords": [
     "tinybase",
