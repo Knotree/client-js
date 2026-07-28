@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — 2026-07-28
+
+- Serialize session refresh across browser tabs with Web Locks when available.
+- Retry refreshes safely during the token reuse grace window and cover the
+  cross-tab coordination behavior with regression tests.
+
 ## 0.3.0 — 2026-07-28
 
 - Add Auth v2 client methods for email OTP verification, OTP resend,
