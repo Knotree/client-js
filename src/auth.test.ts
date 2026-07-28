@@ -297,4 +297,151 @@ describe("auth client", () => {
     await client.auth.revokeSessions({ mode: "all" });
     expect(client.auth.getAccessToken()).toBeNull();
   });
+
+  it("signUp pending_verification does not store a session (Auth v2)", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          status: "pending_verification",
+          user: {
+            id: "u-pending",
+            email: "p@example.com",
+            username: null,
+            status: "active",
+            email_verified: false,
+            last_sign_in_at: null,
+            created_at: new Date().toISOString(),
+          },
+        },
+        error: null,
+        meta: { request_id: "r" },
+      }),
+    );
+    const storage = new MemoryStorage();
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage,
+      autoRefreshToken: false,
+    });
+    const events: string[] = [];
+    client.auth.onAuthStateChange((e) => events.push(e));
+    const { data, error } = await client.auth.signUp({
+      email: "p@example.com",
+      password: "password123",
+    });
+    expect(error).toBeNull();
+    expect(data?.status).toBe("pending_verification");
+    expect(client.auth.getAccessToken()).toBeNull();
+    expect(storage.getItem("tinybase.auth.token")).toBeNull();
+    expect(events).not.toContain("SIGNED_IN");
+  });
+
+  it("signIn EMAIL_NOT_VERIFIED does not set session", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(
+        {
+          data: null,
+          error: {
+            code: "EMAIL_NOT_VERIFIED",
+            message: "email verification required",
+            details: { user_id: "u1", status: "pending_verification" },
+          },
+          meta: { request_id: "r" },
+        },
+        401,
+      ),
+    );
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage: new MemoryStorage(),
+      autoRefreshToken: false,
+    });
+    const { data, error } = await client.auth.signIn({
+      email: "a@example.com",
+      password: "password123",
+    });
+    expect(data).toBeNull();
+    expect(error?.code).toBe("EMAIL_NOT_VERIFIED");
+    expect(client.auth.getAccessToken()).toBeNull();
+  });
+
+  it("verifyEmailOtp stores session; forgot/reset call Auth v2 routes", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/v1/auth/otp/verify")) {
+        return jsonResponse({
+          data: session({ access_token: "verified-access" }),
+          error: null,
+          meta: { request_id: "r" },
+        });
+      }
+      if (url.includes("/v1/auth/otp/resend") || url.includes("/v1/auth/otp/issue")) {
+        return jsonResponse({
+          data: { status: "accepted", message: "If the account can use this email action, instructions will be sent.", expires_in: 600 },
+          error: null,
+          meta: { request_id: "r" },
+        });
+      }
+      if (url.includes("/v1/auth/forgot-password")) {
+        return jsonResponse({
+          data: { status: "accepted", message: "If the account can use this email action, instructions will be sent." },
+          error: null,
+          meta: { request_id: "r" },
+        });
+      }
+      if (url.includes("/v1/auth/reset-password")) {
+        return jsonResponse({
+          data: { status: "password_reset" },
+          error: null,
+          meta: { request_id: "r" },
+        });
+      }
+      return jsonResponse({ data: null, error: { code: "NOT_FOUND", message: "x" }, meta: { request_id: "r" } }, 404);
+    });
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage: new MemoryStorage(),
+      autoRefreshToken: false,
+    });
+
+    const issued = await client.auth.issueEmailOtp({ email: "a@example.com", userId: "u1" });
+    expect(issued.error).toBeNull();
+    expect(issued.data?.status).toBe("accepted");
+
+    const resent = await client.auth.resendEmailOtp({ email: "a@example.com" });
+    expect(resent.error).toBeNull();
+
+    const verified = await client.auth.verifyEmailOtp({
+      code: "123456",
+      email: "a@example.com",
+      userId: "u1",
+    });
+    expect(verified.error).toBeNull();
+    expect(client.auth.getAccessToken()).toBe("verified-access");
+
+    const forgot = await client.auth.forgotPassword({ email: "a@example.com" });
+    expect(forgot.error).toBeNull();
+    expect(forgot.data?.status).toBe("accepted");
+
+    const reset = await client.auth.resetPassword({
+      email: "a@example.com",
+      code: "654321",
+      newPassword: "password456",
+    });
+    expect(reset.error).toBeNull();
+    expect(reset.data?.status).toBe("password_reset");
+
+    const paths = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(paths.some((p) => p.includes("/v1/auth/otp/issue"))).toBe(true);
+    expect(paths.some((p) => p.includes("/v1/auth/otp/resend"))).toBe(true);
+    expect(paths.some((p) => p.includes("/v1/auth/otp/verify"))).toBe(true);
+    expect(paths.some((p) => p.includes("/v1/auth/forgot-password"))).toBe(true);
+    expect(paths.some((p) => p.includes("/v1/auth/reset-password"))).toBe(true);
+  });
 });

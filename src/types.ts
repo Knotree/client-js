@@ -19,6 +19,7 @@ export type AppUser = {
   email: string | null;
   username: string | null;
   status: string;
+  email_verified?: boolean;
   last_sign_in_at: string | null;
   created_at: string;
 };
@@ -33,6 +34,34 @@ export type Session = {
   expires_at?: number;
   /** OAuth Application client id when the session came from Hosted Auth. */
   oauth_client_id?: string;
+  /**
+   * Auth v2: "pending_verification" means signup succeeded without a usable session.
+   * "authenticated" means access+refresh tokens are present.
+   */
+  status?: "authenticated" | "pending_verification";
+};
+
+/** Auth v2 OTP issue/resend public response (enumeration-safe). */
+export type OTPIssueResult = {
+  status: string;
+  message: string;
+  expires_in?: number;
+};
+
+export type VerifyEmailOTPInput = {
+  code: string;
+  email?: string;
+  userId?: string;
+};
+
+export type ForgotPasswordInput = {
+  email: string;
+};
+
+export type ResetPasswordInput = {
+  email: string;
+  code: string;
+  newPassword: string;
 };
 
 export type AuthChangeEvent =

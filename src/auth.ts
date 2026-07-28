@@ -5,15 +5,19 @@ import type {
   AuthChangeEvent,
   AuthStorage,
   ChangePasswordInput,
+  ForgotPasswordInput,
+  OTPIssueResult,
   ResolvedClientOptions,
   Result,
   RedirectCallbackOptions,
   RedirectSignInOptions,
+  ResetPasswordInput,
   RevokeSessionsInput,
   Session,
   SignInCredentials,
   SignUpCredentials,
   UpdateUserInput,
+  VerifyEmailOTPInput,
 } from "./types.js";
 
 type Listener = (event: AuthChangeEvent, session: Session | null) => void;
@@ -64,6 +68,10 @@ export class AuthClient {
     };
   }
 
+  /**
+   * Create a Project app user. With email, Auth v2 returns pending_verification
+   * without storing a session (OTP required). Username-only still signs in.
+   */
   async signUp(credentials: SignUpCredentials): Promise<Result<Session>> {
     await this.ready;
     const result = await request<Session>(
@@ -75,7 +83,7 @@ export class AuthClient {
         auth: false,
       },
     );
-    if (result.data) {
+    if (result.data && this.isUsableSession(result.data)) {
       await this.setSession(result.data, "SIGNED_IN");
     }
     return result;
@@ -92,12 +100,114 @@ export class AuthClient {
         auth: false,
       },
     );
-    if (result.data) {
+    // EMAIL_NOT_VERIFIED: no tokens; client continues OTP step (US-113/US-117).
+    if (result.data && this.isUsableSession(result.data)) {
       await this.setSession(result.data, "SIGNED_IN");
     }
     return result;
   }
 
+  /** Issue a 6-digit email verification OTP (Auth v2). */
+  async issueEmailOtp(input: {
+    email?: string;
+    userId?: string;
+  }): Promise<Result<OTPIssueResult>> {
+    await this.ready;
+    return request<OTPIssueResult>(this.ctx(), "POST", "/v1/auth/otp/issue", {
+      body: {
+        purpose: "verify_email",
+        email: input.email ?? "",
+        user_id: input.userId ?? "",
+      },
+      auth: false,
+    });
+  }
+
+  /** Resend verification OTP (supersedes prior code). */
+  async resendEmailOtp(input: {
+    email?: string;
+    userId?: string;
+  }): Promise<Result<OTPIssueResult>> {
+    await this.ready;
+    return request<OTPIssueResult>(this.ctx(), "POST", "/v1/auth/otp/resend", {
+      body: {
+        purpose: "verify_email",
+        email: input.email ?? "",
+        user_id: input.userId ?? "",
+      },
+      auth: false,
+    });
+  }
+
+  /**
+   * Verify email OTP and store the issued session on success.
+   */
+  async verifyEmailOtp(
+    input: VerifyEmailOTPInput,
+  ): Promise<Result<Session>> {
+    await this.ready;
+    const result = await request<Session>(
+      this.ctx(),
+      "POST",
+      "/v1/auth/otp/verify",
+      {
+        body: {
+          purpose: "verify_email",
+          code: input.code,
+          email: input.email ?? "",
+          user_id: input.userId ?? "",
+        },
+        auth: false,
+      },
+    );
+    if (result.data && this.isUsableSession(result.data)) {
+      await this.setSession(result.data, "SIGNED_IN");
+    }
+    return result;
+  }
+
+  /** Enumeration-safe forgot password (sends OTP when eligible). */
+  async forgotPassword(
+    input: ForgotPasswordInput,
+  ): Promise<Result<OTPIssueResult>> {
+    await this.ready;
+    return request<OTPIssueResult>(
+      this.ctx(),
+      "POST",
+      "/v1/auth/forgot-password",
+      {
+        body: { email: input.email },
+        auth: false,
+      },
+    );
+  }
+
+  /**
+   * Reset password with 6-digit OTP. Does not auto sign-in; caller may signIn after.
+   */
+  async resetPassword(
+    input: ResetPasswordInput,
+  ): Promise<Result<{ status: string }>> {
+    await this.ready;
+    return request<{ status: string }>(
+      this.ctx(),
+      "POST",
+      "/v1/auth/reset-password",
+      {
+        body: {
+          email: input.email,
+          code: input.code,
+          new_password: input.newPassword,
+        },
+        auth: false,
+      },
+    );
+  }
+
+  /**
+   * Hosted Auth Application OAuth redirect (standby / non-primary under Auth v2).
+   * Prefer popup email+password + OTP for customer apps.
+   */
   async signInWithRedirect(
     options: RedirectSignInOptions,
   ): Promise<Result<{ url: string; state: string }>> {
@@ -563,6 +673,17 @@ export class AuthClient {
     } catch {
       // ignore corrupt storage
     }
+  }
+
+  /** True when the response carries a data-plane-usable access token (Auth v2). */
+  private isUsableSession(session: Session): boolean {
+    if (!session?.access_token || !session.refresh_token) {
+      return false;
+    }
+    if (session.status === "pending_verification") {
+      return false;
+    }
+    return true;
   }
 
   private async setSession(
