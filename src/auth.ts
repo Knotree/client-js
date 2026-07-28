@@ -33,6 +33,9 @@ export class AuthClient {
   private ready: Promise<void>;
   private refreshInFlight: Promise<Result<Session>> | null = null;
 
+  private unboundStorageListener: ((e: StorageEvent) => void) | null = null;
+  private unboundVisibilityListener: (() => void) | null = null;
+
   constructor(
     private readonly options: ResolvedClientOptions,
     private readonly getRequestContext: () => RequestContext,
@@ -42,6 +45,7 @@ export class AuthClient {
     this.persist = options.persistSession !== false;
     this.autoRefresh = options.autoRefreshToken !== false;
     this.ready = this.restore();
+    this.bindCrossTabAndVisibility();
   }
 
   private ctx(): RequestContext {
@@ -570,15 +574,35 @@ export class AuthClient {
       };
     }
     const current = this.session;
-    const result = current.oauth_client_id
-      ? await this.refreshHostedSession(current)
-      : await request<Session>(this.ctx(), "POST", "/v1/auth/refresh", {
-          body: { refresh_token: current.refresh_token },
-          auth: false,
-        });
-    if (result.data) {
+    let result: Result<Session>;
+    try {
+      result = current.oauth_client_id
+        ? await this.refreshHostedSession(current)
+        : await request<Session>(this.ctx(), "POST", "/v1/auth/refresh", {
+            body: { refresh_token: current.refresh_token },
+            auth: false,
+          });
+    } catch {
+      // Transient network failure — keep session (D-0073 / US-118).
+      return {
+        data: null,
+        error: {
+          code: "NETWORK_ERROR",
+          message: "session refresh failed due to a network error",
+        },
+      };
+    }
+    if (result.data && this.isUsableSession(result.data)) {
+      // Preserve oauth_client_id across password-path refreshes when present.
+      if (current.oauth_client_id && !result.data.oauth_client_id) {
+        result.data.oauth_client_id = current.oauth_client_id;
+      }
       await this.setSession(result.data, "TOKEN_REFRESHED");
-    } else {
+      return result;
+    }
+    // Clear only on definitive auth failure (invalid/revoked grant), not on
+    // transient 5xx/network/rate-limit responses (D-0073).
+    if (result.error && isDefinitiveAuthFailure(result.error.code)) {
       await this.clearSession("SIGNED_OUT");
     }
     return result;
@@ -660,19 +684,79 @@ export class AuthClient {
       if (!session.access_token) {
         return;
       }
+      // Set in-memory session before any refresh so initialize never flashes signed-out.
       this.session = normalizeSession(session);
       this.scheduleRefresh();
-      // If expired, try refresh immediately.
+      // If expired, try refresh immediately (keep prior session on transient failure).
       if (this.isExpired(this.session)) {
         if (this.session.refresh_token) {
           await this.refreshSessionInternal();
-        } else {
-          await this.clearSession("SIGNED_OUT");
         }
+        // Missing refresh token with expired access: leave session until next action.
       }
     } catch {
       // ignore corrupt storage
     }
+  }
+
+  private bindCrossTabAndVisibility(): void {
+    if (typeof window === "undefined") {
+      return;
+    }
+    // Multi-tab: another tab wrote/cleared the same storage key.
+    this.unboundStorageListener = (event: StorageEvent) => {
+      if (event.key !== this.storageKey) {
+        return;
+      }
+      void this.onExternalStorageChange(event.newValue);
+    };
+    window.addEventListener("storage", this.unboundStorageListener);
+    // Refresh when tab becomes visible and access is near/past expiry.
+    this.unboundVisibilityListener = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void this.onVisibilityRefresh();
+      }
+    };
+    document.addEventListener("visibilitychange", this.unboundVisibilityListener);
+  }
+
+  private async onExternalStorageChange(raw: string | null): Promise<void> {
+    if (!raw) {
+      if (this.session) {
+        this.session = null;
+        this.clearRefreshTimer();
+        this.emit("SIGNED_OUT", null);
+      }
+      return;
+    }
+    try {
+      const session = normalizeSession(JSON.parse(raw) as Session);
+      if (!session.access_token) {
+        return;
+      }
+      const prev = this.session?.access_token;
+      this.session = session;
+      this.scheduleRefresh();
+      if (prev !== session.access_token) {
+        this.emit(prev ? "TOKEN_REFRESHED" : "SIGNED_IN", this.session);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private async onVisibilityRefresh(): Promise<void> {
+    if (!this.session?.refresh_token) {
+      return;
+    }
+    if (this.isExpired(this.session) || this.isNearExpiry(this.session)) {
+      await this.refreshSessionInternal();
+    }
+  }
+
+  private isNearExpiry(session: Session): boolean {
+    const expiresAt = session.expires_at ?? 0;
+    return Date.now() >= expiresAt - 120_000;
   }
 
   /** True when the response carries a data-plane-usable access token (Auth v2). */
@@ -750,6 +834,21 @@ export class AuthClient {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
     }
+  }
+}
+
+function isDefinitiveAuthFailure(code: string): boolean {
+  switch (code) {
+    case "INVALID_GRANT":
+    case "REFRESH_TOKEN_INVALID":
+    case "REFRESH_TOKEN_REUSED":
+    case "TOKEN_INVALID":
+    case "AUTH_REQUIRED":
+    case "INVALID_CREDENTIALS":
+    case "invalid_grant":
+      return true;
+    default:
+      return false;
   }
 }
 

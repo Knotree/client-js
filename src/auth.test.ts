@@ -369,6 +369,80 @@ describe("auth client", () => {
     expect(client.auth.getAccessToken()).toBeNull();
   });
 
+  it("refresh keeps session on network failure and clears only on invalid_grant", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify(session({ expires_at: Date.now() + 60_000 })),
+    );
+    let mode: "network" | "invalid" | "ok" = "network";
+    const fetchMock = vi.fn(async () => {
+      if (mode === "network") {
+        throw new TypeError("Failed to fetch");
+      }
+      if (mode === "invalid") {
+        return jsonResponse(
+          {
+            data: null,
+            error: { code: "INVALID_GRANT", message: "refresh revoked" },
+            meta: { request_id: "r" },
+          },
+          400,
+        );
+      }
+      return jsonResponse({
+        data: session({ access_token: "access-refreshed", refresh_token: "refresh-2" }),
+        error: null,
+        meta: { request_id: "r" },
+      });
+    });
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage,
+      autoRefreshToken: false,
+    });
+    await client.auth.initialize();
+    expect(client.auth.getAccessToken()).toBe("access-1");
+
+    mode = "network";
+    const net = await client.auth.refreshSession();
+    expect(net.error?.code).toBe("NETWORK_ERROR");
+    expect(client.auth.getAccessToken()).toBe("access-1");
+
+    mode = "ok";
+    const ok = await client.auth.refreshSession();
+    expect(ok.error).toBeNull();
+    expect(client.auth.getAccessToken()).toBe("access-refreshed");
+
+    mode = "invalid";
+    const bad = await client.auth.refreshSession();
+    expect(bad.error?.code).toBe("INVALID_GRANT");
+    expect(client.auth.getAccessToken()).toBeNull();
+  });
+
+  it("initialize restores expired session before refresh without clearing on transient failure", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify(session({ expires_at: Date.now() - 10_000 })),
+    );
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("offline");
+    });
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage,
+      autoRefreshToken: false,
+    });
+    await client.auth.initialize();
+    // Still signed in from storage despite failed refresh (no signed-out flash).
+    expect(client.auth.getAccessToken()).toBe("access-1");
+  });
+
   it("verifyEmailOtp stores session; forgot/reset call Auth v2 routes", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
