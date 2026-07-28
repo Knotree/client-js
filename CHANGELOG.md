@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 — 2026-07-28
+
+- Add Auth v2 client methods for email OTP verification, OTP resend,
+  forgot-password, password reset, and pending-signup recovery.
+- Add a built-in React authentication modal with sign-in, sign-up, OTP
+  verification, forgot-password, and reset-password flows.
+- Make `UserButton` work in both signed-out and signed-in states, opening the
+  authentication modal for guests and the account dialog for authenticated
+  users.
+- Harden session refresh against transient network failures, stale refresh
+  responses, and sign-out races while preserving valid local sessions.
+
 ## 0.2.0 — 2026-07-27
 
 - Add an all-in-one React account UI to the existing package through
