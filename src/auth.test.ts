@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "./client.js";
 import { MemoryStorage } from "./storage.js";
 import type { Session } from "./types.js";
@@ -517,5 +517,187 @@ describe("auth client", () => {
     expect(paths.some((p) => p.includes("/v1/auth/otp/verify"))).toBe(true);
     expect(paths.some((p) => p.includes("/v1/auth/forgot-password"))).toBe(true);
     expect(paths.some((p) => p.includes("/v1/auth/reset-password"))).toBe(true);
+  });
+});
+
+describe("cross-tab refresh serialization (D-0074)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("wraps refresh in a Web Lock", async () => {
+    const requestMock = vi.fn(
+      async (_name: string, cb: () => Promise<unknown>) => cb(),
+    );
+    vi.stubGlobal("navigator", { locks: { request: requestMock } });
+
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify(session({ expires_at: Date.now() + 60_000 })),
+    );
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/v1/auth/refresh")) {
+        return jsonResponse({
+          data: session({ access_token: "access-2", refresh_token: "refresh-2" }),
+          error: null,
+          meta: { request_id: "r" },
+        });
+      }
+      return jsonResponse(
+        {
+          data: null,
+          error: { code: "NOT_FOUND", message: "x" },
+          meta: { request_id: "r" },
+        },
+        404,
+      );
+    });
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage,
+      autoRefreshToken: false,
+    });
+    await client.auth.initialize();
+
+    const res = await client.auth.refreshSession();
+    expect(res.data?.access_token).toBe("access-2");
+    expect(requestMock).toHaveBeenCalledWith(
+      "tinybase-auth-refresh",
+      expect.any(Function),
+    );
+  });
+
+  it("adopts a concurrently-rotated session instead of POSTing a stale token", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify(session({ expires_at: Date.now() + 60_000 })),
+    );
+    // Another tab held the lock first and rotated the token before this tab runs.
+    const requestMock = vi.fn(
+      async (_name: string, cb: () => Promise<unknown>) => {
+        storage.setItem(
+          "tinybase.auth.token",
+          JSON.stringify(
+            session({
+              access_token: "access-2",
+              refresh_token: "refresh-2",
+              expires_at: Date.now() + 60_000,
+            }),
+          ),
+        );
+        return cb();
+      },
+    );
+    vi.stubGlobal("navigator", { locks: { request: requestMock } });
+
+    const fetchMock = vi.fn(async () => {
+      throw new Error("refresh must not POST when a rotated session was adopted");
+    });
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage,
+      autoRefreshToken: false,
+    });
+    await client.auth.initialize();
+
+    const events: string[] = [];
+    client.auth.onAuthStateChange((e) => events.push(e));
+    const res = await client.auth.refreshSession();
+    expect(res.data?.access_token).toBe("access-2");
+    expect(res.error).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(events).toContain("TOKEN_REFRESHED");
+  });
+
+  it("grace-retries on REFRESH_TOKEN_REUSED by adopting a concurrently-rotated session", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify(session({ expires_at: Date.now() - 10_000 })),
+    );
+    let refreshCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/v1/auth/refresh")) {
+        refreshCalls += 1;
+        // A concurrent tab rotated the token during this failed refresh.
+        storage.setItem(
+          "tinybase.auth.token",
+          JSON.stringify(
+            session({
+              access_token: "access-2",
+              refresh_token: "refresh-2",
+              expires_at: Date.now() + 60_000,
+            }),
+          ),
+        );
+        return jsonResponse(
+          {
+            data: null,
+            error: { code: "REFRESH_TOKEN_REUSED", message: "reuse detected" },
+            meta: { request_id: "r" },
+          },
+          401,
+        );
+      }
+      throw new Error("unexpected fetch call");
+    });
+    const events: string[] = [];
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage,
+      autoRefreshToken: false,
+    });
+    client.auth.onAuthStateChange((e) => events.push(e));
+    await client.auth.initialize();
+
+    expect(client.auth.getAccessToken()).toBe("access-2");
+    expect(refreshCalls).toBe(1);
+    expect(events).toContain("TOKEN_REFRESHED");
+    expect(events).not.toContain("SIGNED_OUT");
+  });
+
+  it("clears the session on genuine REFRESH_TOKEN_REUSED with no concurrent rotation", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "tinybase.auth.token",
+      JSON.stringify(session({ expires_at: Date.now() - 10_000 })),
+    );
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/v1/auth/refresh")) {
+        return jsonResponse(
+          {
+            data: null,
+            error: { code: "REFRESH_TOKEN_REUSED", message: "reuse detected" },
+            meta: { request_id: "r" },
+          },
+          401,
+        );
+      }
+      throw new Error("unexpected fetch call");
+    });
+    const events: string[] = [];
+    const client = createClient({
+      url: "http://localhost:4000",
+      projectKey: "tb_pk_local_test",
+      fetch: fetchMock as unknown as typeof fetch,
+      storage,
+      autoRefreshToken: false,
+    });
+    client.auth.onAuthStateChange((e) => events.push(e));
+    await client.auth.initialize();
+
+    expect(client.auth.getAccessToken()).toBeNull();
+    expect(events).toContain("SIGNED_OUT");
   });
 });
