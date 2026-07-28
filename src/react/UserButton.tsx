@@ -18,7 +18,7 @@ export function UserButton({
   label = "Open account settings",
   signedOutLabel = "Sign in",
   showName = true,
-  defaultView = "profile",
+  defaultView = "hub",
   afterSignOut,
   onGoogle,
 }: UserButtonProps) {

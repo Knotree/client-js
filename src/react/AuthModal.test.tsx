@@ -123,7 +123,7 @@ describe("React Auth modal / dual-mode UserButton", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
     fireEvent.click(screen.getByRole("button", { name: "Create an account" }));
-    expect(await screen.findByRole("heading", { name: "Create account" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Create your account" })).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "new@example.com" },
     });
@@ -178,7 +178,8 @@ describe("React Auth modal / dual-mode UserButton", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: "Open account settings" }));
     expect(await screen.findByRole("dialog")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Profile" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Welcome back" })).toBeNull();
+    // The new UI lands on the account hub (Overview) by default.
+    expect(screen.getByRole("heading", { name: "Welcome back" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Profile" })).toBeNull();
   });
 });

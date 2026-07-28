@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.4.0 — 2026-07-28
+
+- **Account popup UI/UX overhaul** with a new "Overview" hub landing
+  view (gradient hero with avatar, name, email, and at-a-glance stats),
+  card-based quick actions, and inline 2FA / sign-out shortcuts.
+- **New visual language** in `@knotree/client/react` and
+  `@knotree/client/react-router`: gradient banner, modern typography,
+  elevated cards, and subtle motion (backdrop, sheet, dialog, sheet,
+  shimmer, pulse, toast, hub).
+- **Dark mode** that follows the user's OS preference by default, with
+  an explicit `appearance.mode` (`"light" | `"dark" | "auto"`) override
+  and richer `KnotreeAppearance` tokens (accent2, bg-elev, text-strong,
+  muted2, border-strong, success, warning, borderRadiusSm/Lg).
+- **Toast notifications** (`toast.success`/`toast.error`/`toast.info`) for
+  signed-in, account updated, password updated, session revoked, code
+  re-sent, and similar events, including an auto-dismiss progress bar
+  and an `aria-live` region.
+- **Show/hide password toggle** on every password field (sign-in,
+  sign-up, change password, reset password) with proper `aria-label`
+  flipping, plus **password strength meter** (4-level bar) on
+  sign-up and reset.
+- **Improved sessions UI**: device-aware icons (phone/tablet/laptop/
+  monitor), relative "active N ago" timestamps, full location and
+  signed-in-at metadata, and a **search bar** that filters by device,
+  app, or location.
+- **Better forms**: show/hide password, profile "Reset" button,
+  inline confirmations, email validation, and a **"Reset" link** on
+  the OTP step that surfaces the destination email inline.
+- **Dismissible, icon-led inline notices** with `role="alert"` /
+  `role="status"` and accessible close buttons.
+- **New `AccountHub` landing view** is the new default `defaultView`
+  on `<UserButton />`, with sidebar nav now including Overview,
+  Profile, Security, and Sessions (Sessions has a live badge for
+  the number of other devices).
+- **Two-factor authentication** placeholder card in the hub.
+- **Add `passwordStrength`, `relativeTime`, `formatDate`,
+  `formatDateTime`, `initialsOf`, `deviceIconName`, `isLikelyEmail`
+  utilities** in a new `utils.ts` for downstream applications.
+
 ## 0.3.1 — 2026-07-28
 
 - Serialize session refresh across browser tabs with Web Locks when available.

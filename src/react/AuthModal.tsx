@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -11,7 +12,9 @@ import { createPortal } from "react-dom";
 import { useKnotree } from "./context.js";
 import { Icon } from "./icons.js";
 import { appearanceStyle } from "./styles.js";
+import { toast } from "./toast.js";
 import type { AuthModalProps, AuthView } from "./types.js";
+import { isLikelyEmail, passwordStrength } from "./utils.js";
 
 type OtpPending = {
   email: string;
@@ -27,6 +30,14 @@ function digitsOnly(value: string) {
   return value.replace(/\D/g, "").slice(0, 6);
 }
 
+function passwordLabel(score: 0 | 1 | 2 | 3 | 4): string {
+  if (score === 0) return "Empty";
+  if (score === 1) return "Too weak";
+  if (score === 2) return "Could be stronger";
+  if (score === 3) return "Strong";
+  return "Very strong";
+}
+
 export function AuthModal({
   open,
   onOpenChange,
@@ -34,6 +45,7 @@ export function AuthModal({
   defaultView = "sign-in",
   googleLabel = "Continue with Google",
   onGoogle,
+  brandLabel = "Knotree",
 }: AuthModalProps) {
   const context = useKnotree();
   const { client } = context;
@@ -52,6 +64,9 @@ export function AuthModal({
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const [showPassword, setShowPassword] = useState({ signin: false, signup: false, reset: false, resetConfirm: false });
+  const passwordQuality = useMemo(() => passwordStrength(password), [password]);
+  const newPasswordQuality = useMemo(() => passwordStrength(newPassword), [newPassword]);
 
   useEffect(() => {
     if (open) {
@@ -144,6 +159,10 @@ export function AuthModal({
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
     clearNotice();
+    if (email && !isLikelyEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setBusy(true);
     const result = await client.auth.signIn({
       email: email.trim() || undefined,
@@ -153,6 +172,7 @@ export function AuthModal({
     setBusy(false);
     if (result.data?.access_token) {
       onOpenChange(false);
+      toast.success("Signed in");
       return;
     }
     if (result.error?.code === "EMAIL_NOT_VERIFIED") {
@@ -180,6 +200,10 @@ export function AuthModal({
   const signUp = async (event: FormEvent) => {
     event.preventDefault();
     clearNotice();
+    if (email && !isLikelyEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
@@ -193,6 +217,7 @@ export function AuthModal({
     setBusy(false);
     if (result.data?.access_token) {
       onOpenChange(false);
+      toast.success("Account created");
       return;
     }
     if (result.data?.status === "pending_verification" || result.data?.user) {
@@ -226,6 +251,7 @@ export function AuthModal({
     setBusy(false);
     if (result.data?.access_token) {
       onOpenChange(false);
+      toast.success("Email verified");
       return;
     }
     setError(errMsg(result.error));
@@ -244,12 +270,17 @@ export function AuthModal({
     else {
       setSuccess("A new code is on its way.");
       setResendIn(30);
+      toast.info("Code re-sent");
     }
   };
 
   const forgot = async (event: FormEvent) => {
     event.preventDefault();
     clearNotice();
+    if (email && !isLikelyEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setBusy(true);
     const result = await client.auth.forgotPassword({ email: email.trim() });
     setBusy(false);
@@ -292,6 +323,9 @@ export function AuthModal({
     }
     setSuccess("Password updated. You can sign in now.");
     setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    toast.success("Password updated");
     go("sign-in");
   };
 
@@ -301,7 +335,7 @@ export function AuthModal({
 
   const titles: Record<AuthView, [string, string]> = {
     "sign-in": ["Welcome back", "Sign in to continue to your account."],
-    "sign-up": ["Create account", "A verification code will be sent to your email."],
+    "sign-up": ["Create your account", "A 6-digit code will be sent to verify your email."],
     otp: ["Check your email", `Enter the 6-digit code sent to ${pending?.email || "your email"}.`],
     forgot: ["Forgot password", "We'll email a 6-digit code if the account is eligible."],
     reset: ["Reset password", "Enter the code and choose a new password."],
@@ -322,6 +356,7 @@ export function AuthModal({
           maxLength={6}
           aria-label={`Digit ${i + 1}`}
           value={digit}
+          data-filled={digit.length > 0}
           onChange={(e) => setOtpAt(i, e.target.value)}
           onKeyDown={(e) => onOtpKey(i, e)}
           onPaste={(e) => {
@@ -336,6 +371,7 @@ export function AuthModal({
   return createPortal(
     <div
       className="kt-root kt-backdrop"
+      data-mode={appearance?.mode ?? context.appearance?.mode ?? undefined}
       style={appearanceStyle({ ...context.appearance, ...appearance })}
       onMouseDown={backdropClick}
     >
@@ -354,13 +390,38 @@ export function AuthModal({
         >
           <Icon name="close" width="17" />
         </button>
+        <div className="kt-auth-shell">
+          {brandLabel ? (
+            <div className="kt-auth-banner" aria-hidden="true">
+              <span className="kt-auth-banner-mark">
+                <span className="kt-brand-mark">K</span>
+                {brandLabel}
+              </span>
+            </div>
+          ) : null}
         <div className="kt-auth-body">
-          <h2 id={titleId} className="kt-title">
+          <h2 id={titleId} className="kt-auth-title">
             {title}
           </h2>
-          <p className="kt-subtitle">{subtitle}</p>
-          {error ? <div className="kt-notice kt-error">{error}</div> : null}
-          {success ? <div className="kt-notice kt-success">{success}</div> : null}
+          <p className="kt-auth-subtitle">{subtitle}</p>
+          {error ? (
+            <div className="kt-notice kt-error" role="alert">
+              <Icon name="alert" />
+              <p>{error}</p>
+              <button type="button" className="kt-notice-close" aria-label="Dismiss" onClick={() => setError("")}>
+                <Icon name="close" />
+              </button>
+            </div>
+          ) : null}
+          {success ? (
+            <div className="kt-notice kt-success" role="status">
+              <Icon name="check" />
+              <p>{success}</p>
+              <button type="button" className="kt-notice-close" aria-label="Dismiss" onClick={() => setSuccess("")}>
+                <Icon name="close" />
+              </button>
+            </div>
+          ) : null}
 
           {view === "sign-in" && (
             <form className="kt-auth-form" onSubmit={signIn}>
@@ -378,15 +439,42 @@ export function AuthModal({
               </div>
               <div className="kt-field">
                 <label htmlFor="kt-auth-password">Password</label>
-                <input
-                  id="kt-auth-password"
-                  className="kt-input"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="kt-input-wrap">
+                  <input
+                    id="kt-auth-password"
+                    className="kt-input"
+                    type={showPassword.signin ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="kt-input-action"
+                    aria-label={showPassword.signin ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((s) => ({ ...s, signin: !s.signin }))}
+                  >
+                    <Icon name={showPassword.signin ? "eye-off" : "eye"} />
+                  </button>
+                </div>
+                {password ? (
+                  <div className="kt-strength" aria-hidden="true">
+                    <div className="kt-strength-bars">
+                      {[1, 2, 3, 4].map((level) => (
+                        <span
+                          key={level}
+                          className="kt-strength-bar"
+                          data-level={passwordQuality.score >= level ? level : undefined}
+                        />
+                      ))}
+                    </div>
+                    <div className="kt-strength-label">
+                      <span>Password strength</span>
+                      <strong>{passwordLabel(passwordQuality.score)}</strong>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="kt-auth-links">
                 <button type="button" className="kt-text-link" onClick={() => go("forgot")}>
@@ -404,6 +492,7 @@ export function AuthModal({
                   Create an account
                 </button>
               </p>
+              <div className="kt-divider" aria-hidden="true">or</div>
               {onGoogle ? (
                 <button
                   type="button"
@@ -411,10 +500,12 @@ export function AuthModal({
                   disabled={busy}
                   onClick={() => void onGoogle()}
                 >
+                  <Icon name="google" />
                   {googleLabel}
                 </button>
               ) : (
                 <button type="button" className="kt-button kt-secondary kt-google" disabled title="Google sign-in coming soon">
+                  <Icon name="google" />
                   {googleLabel}
                 </button>
               )}
@@ -446,16 +537,43 @@ export function AuthModal({
               </div>
               <div className="kt-field">
                 <label htmlFor="kt-auth-signup-password">Password</label>
-                <input
-                  id="kt-auth-signup-password"
-                  className="kt-input"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                />
+                <div className="kt-input-wrap">
+                  <input
+                    id="kt-auth-signup-password"
+                    className="kt-input"
+                    type={showPassword.signup ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    className="kt-input-action"
+                    aria-label={showPassword.signup ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((s) => ({ ...s, signup: !s.signup }))}
+                  >
+                    <Icon name={showPassword.signup ? "eye-off" : "eye"} />
+                  </button>
+                </div>
+                {password ? (
+                  <div className="kt-strength" aria-hidden="true">
+                    <div className="kt-strength-bars">
+                      {[1, 2, 3, 4].map((level) => (
+                        <span
+                          key={level}
+                          className="kt-strength-bar"
+                          data-level={passwordQuality.score >= level ? level : undefined}
+                        />
+                      ))}
+                    </div>
+                    <div className="kt-strength-label">
+                      <span>Password strength</span>
+                      <strong>{passwordLabel(passwordQuality.score)}</strong>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="kt-actions kt-auth-actions">
                 <button type="submit" className="kt-button kt-primary" disabled={busy}>
@@ -474,6 +592,11 @@ export function AuthModal({
           {view === "otp" && (
             <form className="kt-auth-form" onSubmit={verifyOtp}>
               {otpFields}
+              {pending?.email ? (
+                <p className="kt-auth-hint">
+                  We sent a 6-digit code to <code>{pending.email}</code>
+                </p>
+              ) : null}
               <div className="kt-actions kt-auth-actions">
                 <button type="submit" className="kt-button kt-primary" disabled={busy || otpCode.length !== 6}>
                   {busy ? "Verifying…" : "Verify email"}
@@ -524,29 +647,72 @@ export function AuthModal({
               {otpFields}
               <div className="kt-field">
                 <label htmlFor="kt-auth-new-password">New password</label>
-                <input
-                  id="kt-auth-new-password"
-                  className="kt-input"
-                  type="password"
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                />
+                <div className="kt-input-wrap">
+                  <input
+                    id="kt-auth-new-password"
+                    className="kt-input"
+                    type={showPassword.reset ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    className="kt-input-action"
+                    aria-label={showPassword.reset ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((s) => ({ ...s, reset: !s.reset }))}
+                  >
+                    <Icon name={showPassword.reset ? "eye-off" : "eye"} />
+                  </button>
+                </div>
+                {newPassword ? (
+                  <div className="kt-strength" aria-hidden="true">
+                    <div className="kt-strength-bars">
+                      {[1, 2, 3, 4].map((level) => (
+                        <span
+                          key={level}
+                          className="kt-strength-bar"
+                          data-level={newPasswordQuality.score >= level ? level : undefined}
+                        />
+                      ))}
+                    </div>
+                    <div className="kt-strength-label">
+                      <span>Password strength</span>
+                      <strong>{passwordLabel(newPasswordQuality.score)}</strong>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="kt-field">
                 <label htmlFor="kt-auth-confirm-password">Confirm password</label>
-                <input
-                  id="kt-auth-confirm-password"
-                  className="kt-input"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={8}
-                />
+                <div className="kt-input-wrap">
+                  <input
+                    id="kt-auth-confirm-password"
+                    className="kt-input"
+                    type={showPassword.resetConfirm ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    aria-invalid={confirmPassword.length > 0 && confirmPassword !== newPassword}
+                  />
+                  <button
+                    type="button"
+                    className="kt-input-action"
+                    aria-label={showPassword.resetConfirm ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((s) => ({ ...s, resetConfirm: !s.resetConfirm }))}
+                  >
+                    <Icon name={showPassword.resetConfirm ? "eye-off" : "eye"} />
+                  </button>
+                </div>
+                {confirmPassword.length > 0 && confirmPassword !== newPassword ? (
+                  <span className="kt-field-error">
+                    <Icon name="alert" width="12" /> Passwords do not match
+                  </span>
+                ) : null}
               </div>
               <div className="kt-actions kt-auth-actions">
                 <button type="submit" className="kt-button kt-primary" disabled={busy}>
@@ -555,6 +721,7 @@ export function AuthModal({
               </div>
             </form>
           )}
+        </div>
         </div>
       </div>
     </div>,

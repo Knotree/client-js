@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { Session } from "../types.js";
 import { accountStyles, STYLE_ID } from "./styles.js";
+import { Toaster } from "./toast.js";
 import type {
   AccountView,
   KnotreeAppearance,
@@ -44,7 +45,7 @@ export function KnotreeProvider({
   const [ready, setReady] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
-  const [activeView, setActiveView] = useState<AccountView>("profile");
+  const [activeView, setActiveView] = useState<AccountView>("hub");
 
   useEffect(() => {
     let mounted = true;
@@ -76,7 +77,7 @@ export function KnotreeProvider({
     document.head.appendChild(style);
   }, []);
 
-  const openUserProfile = useCallback((view: AccountView = "profile") => {
+  const openUserProfile = useCallback((view: AccountView = "hub") => {
     setActiveView(view);
     setProfileOpen(true);
   }, []);
@@ -119,6 +120,7 @@ export function KnotreeProvider({
   return (
     <AccountUiContext.Provider value={value}>
       {children}
+      <Toaster />
     </AccountUiContext.Provider>
   );
 }
@@ -130,3 +132,4 @@ export function useKnotree() {
   }
   return value;
 }
+
