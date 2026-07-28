@@ -24,6 +24,9 @@ type AccountUiContextValue = {
   openUserProfile: (view?: AccountView) => void;
   closeUserProfile: () => void;
   setActiveView: (view: AccountView) => void;
+  authOpen: boolean;
+  openSignIn: () => void;
+  closeSignIn: () => void;
   afterSignOut?: () => void;
 };
 
@@ -40,6 +43,7 @@ export function KnotreeProvider({
   );
   const [ready, setReady] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
   const [activeView, setActiveView] = useState<AccountView>("profile");
 
   useEffect(() => {
@@ -54,6 +58,7 @@ export function KnotreeProvider({
         setSession(next);
         setReady(true);
         if (!next) setProfileOpen(false);
+        if (next) setAuthOpen(false);
       }
     });
     return () => {
@@ -76,6 +81,8 @@ export function KnotreeProvider({
     setProfileOpen(true);
   }, []);
   const closeUserProfile = useCallback(() => setProfileOpen(false), []);
+  const openSignIn = useCallback(() => setAuthOpen(true), []);
+  const closeSignIn = useCallback(() => setAuthOpen(false), []);
 
   const value = useMemo<AccountUiContextValue>(
     () => ({
@@ -88,14 +95,20 @@ export function KnotreeProvider({
       openUserProfile,
       closeUserProfile,
       setActiveView,
+      authOpen,
+      openSignIn,
+      closeSignIn,
       afterSignOut: onAfterSignOut,
     }),
     [
       activeView,
       appearance,
+      authOpen,
       client,
+      closeSignIn,
       closeUserProfile,
       onAfterSignOut,
+      openSignIn,
       openUserProfile,
       profileOpen,
       ready,

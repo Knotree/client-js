@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { AuthModal } from "./AuthModal.js";
 import { Icon } from "./icons.js";
 import { UserProfile } from "./UserProfile.js";
 import { appearanceStyle } from "./styles.js";
@@ -15,9 +16,11 @@ export function UserButton({
   className,
   style,
   label = "Open account settings",
+  signedOutLabel = "Sign in",
   showName = true,
   defaultView = "profile",
   afterSignOut,
+  onGoogle,
 }: UserButtonProps) {
   const {
     session,
@@ -26,11 +29,62 @@ export function UserButton({
     profileOpen,
     openUserProfile,
     closeUserProfile,
+    authOpen,
+    openSignIn,
+    closeSignIn,
   } = useKnotree();
   const name = session?.user.username || session?.user.email || "Account";
   const avatar = useMemo(() => initials(name).toUpperCase(), [name]);
 
-  if (!ready || !session) return null;
+  // Avoid signed-in/out flash before restore completes (D-0073 / US-119).
+  if (!ready) {
+    return (
+      <span
+        className={`kt-root kt-user-button kt-user-skeleton${className ? ` ${className}` : ""}`}
+        style={{
+          ...appearanceStyle({ ...inherited, ...appearance }),
+          ...style,
+        }}
+        aria-hidden="true"
+      >
+        <span className="kt-avatar kt-avatar-skeleton" />
+        {showName ? <span className="kt-user-label kt-skel-bar" /> : null}
+      </span>
+    );
+  }
+
+  if (!session) {
+    return (
+      <>
+        <button
+          type="button"
+          aria-label={signedOutLabel}
+          aria-haspopup="dialog"
+          aria-expanded={authOpen}
+          className={`kt-root kt-user-button kt-user-button-signed-out${className ? ` ${className}` : ""}`}
+          style={{
+            ...appearanceStyle({ ...inherited, ...appearance }),
+            ...style,
+          }}
+          onClick={() => openSignIn()}
+        >
+          <span className="kt-avatar" aria-hidden="true">
+            <Icon name="user" width="16" />
+          </span>
+          {showName && <span className="kt-user-label">{signedOutLabel}</span>}
+        </button>
+        <AuthModal
+          open={authOpen}
+          onOpenChange={(open) => {
+            if (open) openSignIn();
+            else closeSignIn();
+          }}
+          appearance={appearance}
+          onGoogle={onGoogle}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -46,7 +100,9 @@ export function UserButton({
         }}
         onClick={() => openUserProfile(defaultView)}
       >
-        <span className="kt-avatar" aria-hidden="true">{avatar}</span>
+        <span className="kt-avatar" aria-hidden="true">
+          {avatar}
+        </span>
         {showName && <span className="kt-user-label">{name}</span>}
         <Icon className="kt-chevron" name="chevron" />
       </button>
