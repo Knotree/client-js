@@ -377,6 +377,25 @@ export function UserProfile({
               <p className="kt-subtitle">{meta.subtitle}</p>
             </div>
           </header>
+          {notice ? (
+            <div
+              className={`kt-notice kt-${notice.kind === "info" ? "info" : notice.kind}`}
+              role={notice.kind === "error" ? "alert" : undefined}
+              aria-live={notice.kind === "error" ? undefined : "polite"}
+              style={{ margin: "16px 34px 0" }}
+            >
+              <Icon name={notice.kind === "error" ? "alert" : notice.kind === "success" ? "check" : "info"} />
+              <p>{notice.message}</p>
+              <button
+                type="button"
+                className="kt-notice-close"
+                aria-label="Dismiss"
+                onClick={clearNotice}
+              >
+                <Icon name="close" />
+              </button>
+            </div>
+          ) : null}
           {view === "hub" && (
             <AccountHub
               session={session}

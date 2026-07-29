@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.1 — 2026-07-29
+
+- **Account popup redesign (“Identity lattice”).** Cool mist canvas, teal→cyan
+  key accent, Outfit display + Source Sans 3 body, and a signature lattice
+  rail on the dialog edge. Applies to account settings and auth shells.
+- Squircle gradient avatars, elevated nav pills, mesh-washed hub hero, and
+  refined primary CTAs with soft accent shadow.
+- In-dialog dismissible notices on profile/security/session actions (errors
+  as `alert`; success still surfaces via toast for status readers).
+- Auth banner always carries the lattice identity strip (even without a
+  brand label).
+- No public API changes. Class names, `--kt-*` tokens, and
+  `KnotreeAppearance` / `data-mode` behavior are unchanged.
+
 ## 0.5.0 — 2026-07-28
 
 - **Account popup redesign** with a calm, hairline-driven visual language

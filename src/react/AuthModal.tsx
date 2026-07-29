@@ -398,7 +398,9 @@ export function AuthModal({
                 {brandLabel}
               </span>
             </div>
-          ) : null}
+          ) : (
+            <div className="kt-auth-banner" aria-hidden="true" style={{ paddingBlock: 14 }} />
+          )}
         <div className="kt-auth-body">
           <h2 id={titleId} className="kt-auth-title">
             {title}
