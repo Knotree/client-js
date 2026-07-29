@@ -107,6 +107,14 @@ export type RedirectCallbackOptions = {
   replaceHistory?: (url: string) => void;
 };
 
+export type GoogleSignInOptions = {
+  /** Exact browser callback URL allowed by the Project origin list. */
+  returnUri?: string;
+  /** Defaults to sign-in; link requires an authenticated session and password. */
+  mode?: "signin" | "link";
+  currentPassword?: string;
+};
+
 /** Generic database schema map for typed .from() helpers. */
 export type GenericTable = {
   Row: Record<string, unknown>;

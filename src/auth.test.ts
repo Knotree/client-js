@@ -29,6 +29,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("auth client", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("signIn stores session and emits SIGNED_IN", async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({ data: session(), error: null, meta: { request_id: "r" } }),

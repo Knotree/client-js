@@ -6,6 +6,7 @@ import type {
   AuthStorage,
   ChangePasswordInput,
   ForgotPasswordInput,
+  GoogleSignInOptions,
   OTPIssueResult,
   ResolvedClientOptions,
   Result,
@@ -114,6 +115,82 @@ export class AuthClient {
       await this.setSession(result.data, "SIGNED_IN");
     }
     return result;
+  }
+
+  /**
+   * Open first-party Google sign-in in a popup. This Project-plane flow does
+   * not use Hosted Auth Applications or the OAuth consent endpoint.
+   */
+  async signInWithGoogle(
+    options: GoogleSignInOptions = {},
+  ): Promise<Result<Session>> {
+    await this.ready;
+    if (typeof window === "undefined" || typeof window.open !== "function") {
+      return redirectError("GOOGLE_BROWSER_REQUIRED", "Google sign-in requires a browser");
+    }
+    const mode = options.mode ?? "signin";
+    const returnUri = options.returnUri ?? window.location.href;
+    const popup = window.open(
+      "about:blank",
+      "tinybase-google-sign-in",
+      "popup,width=480,height=720,resizable=yes,scrollbars=yes",
+    );
+    if (!popup) {
+      return redirectError("GOOGLE_POPUP_BLOCKED", "Google sign-in popup was blocked");
+    }
+    const started = await request<{ authorization_url: string }>(
+      this.ctx(),
+      "POST",
+      "/v1/auth/google/start",
+      {
+        body: {
+          mode,
+          return_uri: returnUri,
+          current_password: options.currentPassword ?? "",
+        },
+        auth: mode === "link",
+      },
+    );
+    if (!started.data) {
+      popup.close();
+      return { data: null, error: started.error };
+    }
+    const authorizationURL = started.data.authorization_url;
+    return new Promise<Result<Session>>((resolve) => {
+      const expectedOrigin = new URL(returnUri).origin;
+      let settled = false;
+      const finish = (result: Result<Session>) => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener("message", onMessage);
+        if (timer !== null) window.clearInterval(timer);
+        if (!popup.closed) popup.close();
+        resolve(result);
+      };
+      const onMessage = (event: MessageEvent) => {
+        if (event.origin !== expectedOrigin || event.source !== popup) return;
+        const payload = event.data as {
+          type?: string;
+          session?: Session | null;
+          error?: { code?: string; message?: string };
+        };
+        if (payload?.type !== "google_result") return;
+        if (payload.error) {
+          finish(redirectError(payload.error.code ?? "GOOGLE_SIGN_IN_FAILED", payload.error.message ?? "Google sign-in failed"));
+          return;
+        }
+        if (mode === "signin" && payload.session) {
+          void this.setSession(payload.session, "SIGNED_IN").then(() => finish({ data: this.session, error: null }));
+          return;
+        }
+        finish({ data: payload.session ?? null, error: null });
+      };
+      window.addEventListener("message", onMessage);
+      const timer = window.setInterval(() => {
+        if (popup.closed) finish(redirectError("GOOGLE_CANCELLED", "Google sign-in was cancelled"));
+      }, 250);
+      popup.location.href = authorizationURL;
+    });
   }
 
   /** Issue a 6-digit email verification OTP (Auth v2). */

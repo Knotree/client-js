@@ -15,6 +15,7 @@ export type {
   ForgotPasswordInput,
   GenericDatabase,
   GenericTable,
+  GoogleSignInOptions,
   FunctionInvokeOptions,
   FunctionInvokeResult,
   FunctionResponseMeta,

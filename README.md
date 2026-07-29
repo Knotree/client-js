@@ -238,6 +238,23 @@ for the repository when available.
 
 ## Hosted redirect authentication
 
+For primary Project app-user login, use first-party Google popup auth. It uses
+the Project public key, issues the normal Project session, and never opens
+`/oauth/authorize` or a Hosted Auth consent page:
+
+```ts
+const result = await tb.auth.signInWithGoogle({
+  returnUri: window.location.href,
+});
+```
+
+The Project owner must configure Google client credentials and an exact callback
+URI. `signInWithGoogle({ mode: "link", currentPassword })` links Google only
+after password reauthentication. Existing password accounts are never linked
+automatically by matching email.
+
+`signInWithRedirect` below is Hosted Auth OAuth standby and is not primary.
+
 Register an exact callback in the TinyBase Application (this is separate from
 Project CORS), then start a redirect. The SDK creates high-entropy state and
 PKCE S256 values and stores each attempt separately:
