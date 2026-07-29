@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3 — 2026-07-29
+
+- **Account dashboard redesign.** Replaces the previous account hub cards with a compact graphite application shell matching the account dashboard design specification.
+- Adds a dense account summary with joined date, other-device count, and last sign-in metadata.
+- Adds accessible account action rows, a real two-factor switch state, responsive mobile layout, visible focus states, and confirmation-gated sign-out.
+- No public API changes.
+
 ## 0.5.1 — 2026-07-29
 
 - **Account popup redesign (“Identity lattice”).** Cool mist canvas, teal→cyan

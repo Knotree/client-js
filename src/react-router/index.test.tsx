@@ -59,7 +59,8 @@ describe("KnotreeRouterProvider", () => {
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Open account settings" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign out" }).at(-1)!);
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm sign out" }));
     expect(await screen.findByText("/login")).toBeTruthy();
   });
 });

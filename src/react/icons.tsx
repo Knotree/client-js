@@ -267,4 +267,3 @@ export function Icon({
 }
 
 export type { IconName };
-

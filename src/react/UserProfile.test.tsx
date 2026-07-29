@@ -124,22 +124,18 @@ describe("React account UI", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
-  it("lands on the account hub with hero and quick actions", async () => {
+  it("lands on the account dashboard with summary and action rows", async () => {
     await setup(vi.fn<typeof fetch>());
     fireEvent.click(screen.getByRole("button", { name: "Open account settings" }));
     const dialog = await screen.findByRole("dialog");
-    expect(dialog.querySelector(".kt-hub-hero")).toBeTruthy();
-    expect(dialog.querySelector(".kt-hub-grid")).toBeTruthy();
-    expect(dialog.querySelectorAll(".kt-hub-card")).toHaveLength(3);
-    expect(dialog.querySelectorAll(".kt-hub-list-item")).toHaveLength(2);
-    // Verify quick-action card titles are rendered
-    expect(dialog.querySelector(".kt-hub-grid")?.textContent).toContain("Edit profile");
-    expect(dialog.querySelector(".kt-hub-grid")?.textContent).toContain("Password & security");
-    expect(dialog.querySelector(".kt-hub-grid")?.textContent).toContain("Active sessions");
-    expect(dialog.querySelector(".kt-hub-list")?.textContent).toContain(
-      "Two-factor authentication",
-    );
-    expect(dialog.querySelector(".kt-hub-list")?.textContent).toContain("Sign out of this device");
+    expect(dialog.querySelector(".kt-summary")).toBeTruthy();
+    expect(dialog.querySelector(".kt-action-list")).toBeTruthy();
+    expect(dialog.querySelectorAll(".kt-action-row")).toHaveLength(4);
+    expect(dialog.querySelector(".kt-signout-section")).toBeTruthy();
+    expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Edit profile");
+    expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Password & security");
+    expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Active sessions");
+    expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Two-factor authentication");
   });
 
   it("respects appearance.mode override and password show/hide toggle", async () => {

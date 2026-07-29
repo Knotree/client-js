@@ -85,10 +85,11 @@ export function UserProfile({
   const [busy, setBusy] = useState<string | null>(null);
   const [sessionSearch, setSessionSearch] = useState("");
   const [confirm, setConfirm] = useState<{
-    mode: "one" | "all" | "others";
+    mode: "one" | "all" | "others" | "signout";
     displayId?: string;
     device?: string;
   } | null>(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showPassword, setShowPassword] = useState({ current: false, next: false, confirm: false });
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -357,7 +358,7 @@ export function UserProfile({
               type="button"
               className="kt-nav-button kt-signout"
               disabled={busy === "signout"}
-              onClick={() => void signOut()}
+               onClick={() => setConfirm({ mode: "signout" })}
             >
               <Icon name="logout" />
               {busy === "signout" ? "Signing out…" : "Sign out"}
@@ -402,10 +403,29 @@ export function UserProfile({
               otherSessionsCount={otherSessionsCount}
               initials={initials}
               onOpen={selectView}
-              onSignOut={() => void signOut()}
-              signingOut={busy === "signout"}
+               onSignOut={() => setConfirm({ mode: "signout" })}
+               twoFactorEnabled={twoFactorEnabled}
+               onToggleTwoFactor={() => setTwoFactorEnabled((enabled) => !enabled)}
+               signingOut={busy === "signout"}
             />
           )}
+          {view === "hub" && confirm?.mode === "signout" ? (
+            <div className="kt-confirm kt-hub-confirm" role="alertdialog" aria-labelledby={`${titleId}-signout-title`}>
+              <div className="kt-confirm-head">
+                <span className="kt-confirm-icon" aria-hidden="true"><Icon name="alert" /></span>
+                <div>
+                  <h4 id={`${titleId}-signout-title`}>Sign out of this device?</h4>
+                  <p>You will need to sign in again to access your account.</p>
+                </div>
+              </div>
+              <div className="kt-confirm-actions">
+                <button type="button" className="kt-button kt-secondary" onClick={() => setConfirm(null)} disabled={busy !== null}>Cancel</button>
+                <button type="button" className="kt-button kt-danger-button" onClick={() => void signOut()} disabled={busy !== null}>
+                  {busy === "signout" ? <><Icon name="spinner" className="kt-spin" /> Signing out…</> : "Confirm sign out"}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {view === "profile" && (
             <form className="kt-view" onSubmit={(event) => void saveProfile(event)}>
@@ -780,14 +800,18 @@ export function UserProfile({
                         </span>
                         <div>
                           <h4 id={`${titleId}-confirm-title`}>
-                            {confirm.mode === "all"
+                            {confirm.mode === "signout"
+                              ? "Sign out of this device?"
+                              : confirm.mode === "all"
                               ? "Sign out everywhere?"
                               : confirm.mode === "others"
                                 ? "Sign out other devices?"
                                 : `Sign out ${confirm.device || "this device"}?`}
                           </h4>
                           <p>
-                            {confirm.mode === "all"
+                             {confirm.mode === "signout"
+                               ? "You will need to sign in again to access your account."
+                               : confirm.mode === "all"
                               ? "This also ends the session on this device."
                               : "Your current session will remain active."}
                           </p>
@@ -806,9 +830,13 @@ export function UserProfile({
                           type="button"
                           className="kt-button kt-danger-button"
                           disabled={busy !== null}
-                          onClick={() => void revoke(confirm.mode, confirm.displayId)}
+                           onClick={() =>
+                             void (confirm.mode === "signout"
+                               ? signOut()
+                               : revoke(confirm.mode, confirm.displayId))
+                           }
                         >
-                          {busy && busy.startsWith(confirm.mode) ? (
+                           {busy && busy.startsWith(confirm.mode) ? (
                             <>
                               <Icon name="spinner" className="kt-spin" /> Working…
                             </>
@@ -836,6 +864,8 @@ function AccountHub({
   initials,
   onOpen,
   onSignOut,
+  twoFactorEnabled,
+  onToggleTwoFactor,
   signingOut,
 }: {
   session: Session;
@@ -843,117 +873,57 @@ function AccountHub({
   initials: string;
   onOpen: (view: AccountView) => void;
   onSignOut: () => void;
+  twoFactorEnabled: boolean;
+  onToggleTwoFactor: () => void;
   signingOut: boolean;
 }) {
   const name = displayName(session);
   return (
-    <div className="kt-view">
-      <div className="kt-hub">
-        <div className="kt-hub-hero">
-          <span className="kt-avatar kt-avatar-lg" aria-hidden="true">
-            {initials}
-          </span>
-          <div className="kt-hub-hero-copy">
-            <h3 className="kt-hub-hero-name">
+    <div className="kt-view kt-account-home">
+      <section className="kt-summary" aria-labelledby="account-summary-title">
+        <div className="kt-summary-identity">
+          <span className="kt-avatar kt-avatar-lg" aria-hidden="true">{initials}</span>
+          <div className="kt-summary-copy">
+            <div className="kt-summary-name" id="account-summary-title">
               {name}
-              {session.user.email_verified ? (
-                <span className="kt-badge">
-                  <Icon name="check" width="11" /> Verified
-                </span>
-              ) : null}
-            </h3>
-            {session.user.email ? <p className="kt-hub-hero-email">{session.user.email}</p> : null}
-            <div className="kt-hub-hero-stats">
-              <div className="kt-hub-stat">
-                Member
-                <strong>{formatDate(session.user.created_at)}</strong>
-              </div>
-              <div className="kt-hub-stat">
-                Other devices
-                <strong>{otherSessionsCount}</strong>
-              </div>
-              <div className="kt-hub-stat">
-                Last sign-in
-                <strong>
-                  {session.user.last_sign_in_at
-                    ? relativeTime(session.user.last_sign_in_at)
-                    : "First time"}
-                </strong>
-              </div>
+              <span className="kt-badge">{session.user.email_verified ? "Verified" : "Member"}</span>
             </div>
+            {session.user.email ? <div className="kt-summary-email" title={session.user.email}>{session.user.email}</div> : null}
           </div>
         </div>
-        <div className="kt-hub-grid">
-          <button type="button" className="kt-hub-card" onClick={() => onOpen("profile")}>
-            <span className="kt-hub-card-icon" aria-hidden="true">
-              <Icon name="user" />
-            </span>
-            <h3>Edit profile</h3>
-            <p>Update your name, email, and public details.</p>
-            <span className="kt-hub-card-meta">{session.user.email ? "Email on file" : "Add email"}</span>
-            <span className="kt-hub-card-arrow" aria-hidden="true">
-              <Icon name="arrow-right" />
-            </span>
-          </button>
-          <button type="button" className="kt-hub-card" onClick={() => onOpen("security")}>
-            <span className="kt-hub-card-icon" aria-hidden="true">
-              <Icon name="lock" />
-            </span>
-            <h3>Password & security</h3>
-            <p>Change your password and protect your account.</p>
-            <span className="kt-hub-card-meta">Password set</span>
-            <span className="kt-hub-card-arrow" aria-hidden="true">
-              <Icon name="arrow-right" />
-            </span>
-          </button>
-          <button type="button" className="kt-hub-card" onClick={() => onOpen("sessions")}>
-            <span className="kt-hub-card-icon" aria-hidden="true">
-              <Icon name="sessions" />
-            </span>
-            <h3>Active sessions</h3>
-            <p>Review and revoke devices where you are signed in.</p>
-            <span className="kt-hub-card-meta">
-              {otherSessionsCount === 0 ? "Just this device" : `${otherSessionsCount} other`}
-            </span>
-            <span className="kt-hub-card-arrow" aria-hidden="true">
-              <Icon name="arrow-right" />
-            </span>
-          </button>
+        <div className="kt-summary-divider" />
+        <div className="kt-summary-meta">
+          <div><span>Joined</span><strong>{formatDate(session.user.created_at)}</strong></div>
+          <div><span>Other devices</span><strong>{otherSessionsCount}</strong></div>
+          <div><span>Last sign-in</span><strong>{session.user.last_sign_in_at ? relativeTime(session.user.last_sign_in_at) : "First time"}</strong></div>
         </div>
-        <div className="kt-hub-list">
-          <button type="button" className="kt-hub-list-item" onClick={() => onOpen("security")}>
-            <span className="kt-hub-list-icon" aria-hidden="true">
-              <Icon name="shield" />
-            </span>
-            <div className="kt-hub-list-item-main">
-              <div className="kt-hub-list-item-title">Two-factor authentication</div>
-              <div className="kt-hub-list-item-copy">Require a second step at sign-in.</div>
-            </div>
-            <span className="kt-hub-list-chevron" aria-hidden="true">
-              <Icon name="chevron" />
-            </span>
-          </button>
-          <button type="button" className="kt-hub-list-item" onClick={onSignOut} disabled={signingOut}>
-            <span
-              className="kt-hub-list-icon"
-              aria-hidden="true"
-              style={{ color: "var(--kt-danger)", background: "var(--kt-danger-soft)" }}
-            >
-              <Icon name="logout" />
-            </span>
-            <div className="kt-hub-list-item-main">
-              <div className="kt-hub-list-item-title">
-                {signingOut ? "Signing out…" : "Sign out of this device"}
-              </div>
-              <div className="kt-hub-list-item-copy">You can sign back in at any time.</div>
-            </div>
-            <span className="kt-hub-list-chevron" aria-hidden="true">
-              <Icon name="arrow-right" />
-            </span>
-          </button>
-        </div>
-      </div>
+      </section>
+      <section className="kt-action-list" aria-label="Account actions">
+        <button type="button" className="kt-action-row" onClick={() => onOpen("profile")}>
+          <span className="kt-action-icon" aria-hidden="true"><Icon name="user" /></span>
+          <span className="kt-action-copy"><strong>Edit profile</strong><span>Update your name, email, and public details.</span></span>
+          <Icon name="chevron" className="kt-action-chevron" />
+        </button>
+        <button type="button" className="kt-action-row" onClick={() => onOpen("security")}>
+          <span className="kt-action-icon" aria-hidden="true"><Icon name="lock" /></span>
+          <span className="kt-action-copy"><strong>Password &amp; security</strong><span>Change your password and protect your account.</span></span>
+          <span className="kt-action-status">Password set</span>
+        </button>
+        <button type="button" className="kt-action-row" onClick={() => onOpen("sessions")}>
+          <span className="kt-action-icon" aria-hidden="true"><Icon name="sessions" /></span>
+          <span className="kt-action-copy"><strong>Active sessions</strong><span>Review and revoke devices where you are signed in.</span></span>
+          <span className="kt-action-status">{otherSessionsCount} other</span>
+        </button>
+        <button type="button" className="kt-action-row" onClick={onToggleTwoFactor}>
+          <span className="kt-action-icon" aria-hidden="true"><Icon name="shield" /></span>
+          <span className="kt-action-copy"><strong>Two-factor authentication</strong><span>Require a second step at sign-in.</span></span>
+          <span className="kt-switch" role="switch" aria-checked={twoFactorEnabled} aria-label="Two-factor authentication" data-checked={twoFactorEnabled}><span /></span>
+        </button>
+      </section>
+      <section className="kt-signout-section">
+        <div><strong>Sign out</strong><span>End this session on the current device.</span></div>
+        <button type="button" className="kt-button kt-signout-button" onClick={onSignOut} disabled={signingOut}>{signingOut ? "Signing out…" : "Sign out"}</button>
+      </section>
     </div>
   );
 }
-
