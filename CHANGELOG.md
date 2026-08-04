@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.4 — 2026-08-04
+
+- **Account UI cohesion pass.** Collapses three stacked injected theme layers into a single DESIGN_SPEC-aligned graphite shell (fixed nav rail + workspace) with a first-class light mode.
+- Prefetches sessions when the account dialog opens so hub “Other devices” metadata is accurate without visiting Sessions first.
+- Truncated identity labels expose full values via `title`; two-factor control uses switch semantics on the action row.
+- Defensive sessions handling when the list API returns a non-array payload.
+- No public API changes.
+
 ## 0.5.3 — 2026-07-29
 
 - **Account dashboard redesign.** Replaces the previous account hub cards with a compact graphite application shell matching the account dashboard design specification.
