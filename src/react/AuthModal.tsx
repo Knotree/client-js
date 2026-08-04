@@ -381,15 +381,21 @@ export function AuthModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-layout="auth-sheet"
       >
-        <button
-          type="button"
-          className="kt-icon-button kt-close"
-          aria-label="Close authentication"
-          onClick={() => onOpenChange(false)}
-        >
-          <Icon name="close" width="17" />
-        </button>
+        <div className="kt-dialog-chrome">
+          <div className="kt-sheet-grip" aria-hidden="true">
+            <span />
+          </div>
+          <button
+            type="button"
+            className="kt-icon-button kt-close"
+            aria-label="Close authentication"
+            onClick={() => onOpenChange(false)}
+          >
+            <Icon name="close" width="17" />
+          </button>
+        </div>
         <div className="kt-auth-shell">
           {brandLabel ? (
             <div className="kt-auth-banner" aria-hidden="true">

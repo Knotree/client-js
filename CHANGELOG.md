@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.5 — 2026-08-05
+
+- **Account UI elevation (instrument-panel graphite).** Distinctive signal-edge shell, refined tokens, and toast/auth polish while keeping the BaaS control-surface feel (not template defaults).
+- **Responsive mobile sheet.** Bottom-sheet account/auth dialogs with in-flow `.kt-dialog-chrome` (grip + close), pill nav that cannot be covered by close, and `flex-shrink:0` / touch-sized (44px) mobile nav so labels stay fully visible.
+- Keyboard `:focus-visible` rings and `prefers-reduced-motion: reduce` quality floor retained and covered by style contract tests.
+- Exports `STYLE_ID`, `RESPONSIVE_MAX_WIDTH_PX`, `accountStyles`, and `appearanceStyle` from `@knotree/client/react` for consumers and tests.
+- **Images client** (from prior commit on main): project media APIs for image management.
+- No breaking public component API changes.
+
 ## 0.5.4 — 2026-08-04
 
 - **Account UI cohesion pass.** Collapses three stacked injected theme layers into a single DESIGN_SPEC-aligned graphite shell (fixed nav rail + workspace) with a first-class light mode.

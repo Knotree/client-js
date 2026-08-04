@@ -330,16 +330,22 @@ export function UserProfile({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-layout="shell"
       >
-        <button
-          type="button"
-          className="kt-icon-button kt-close"
-          aria-label="Close account settings"
-          onClick={() => onOpenChange(false)}
-        >
-          <Icon name="close" />
-        </button>
-        <aside className="kt-sidebar">
+        <div className="kt-dialog-chrome">
+          <div className="kt-sheet-grip" aria-hidden="true">
+            <span />
+          </div>
+          <button
+            type="button"
+            className="kt-icon-button kt-close"
+            aria-label="Close account settings"
+            onClick={() => onOpenChange(false)}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+        <aside className="kt-sidebar" aria-label="Account navigation">
           <div className="kt-brand">
             <span className="kt-brand-mark" aria-hidden="true">K</span>
             Account

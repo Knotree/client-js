@@ -12,9 +12,13 @@ The interface should feel compact, serious, and native to a developer-facing pro
 
 ## 2. Visual direction
 
-Dark graphite shell with a slightly warmer content panel. Use thin neutral borders, modest corner radii, restrained blue for identity/status, and coral-red only for destructive sign-out actions.
+**Subject:** embedded BaaS auth/account chrome for host-app end users.  
+**Audience:** people signing in and managing security inside a product.  
+**Single job:** authenticate and reach account actions without leaving the app.
 
-**Signature element:** the page is presented as one large rounded application shell divided into a fixed navigation rail and a dense account workspace. The shell, rather than individual cards, is the dominant visual object.
+Dark instrument-panel graphite with a cooler content rail. Use thin neutral borders, modest corner radii, restrained signal-blue for identity/status, and coral-red only for destructive sign-out actions. Avoid cream+serif, acid-green-on-black, and zero-radius broadsheet defaults — this product should feel like a precise control surface, not a marketing template.
+
+**Signature element:** one large rounded application shell with a powered **signal edge** (subtle left rail accent + top rim highlight) divided into a fixed navigation rail and a dense account workspace. The shell, rather than individual cards, is the dominant visual object. On phones the shell becomes a bottom sheet with a grip handle and pill-style horizontal nav.
 
 ---
 
@@ -23,29 +27,30 @@ Dark graphite shell with a slightly warmer content panel. Use thin neutral borde
 ### Colors
 
 ```css
---page-bg: #0b0c0c;
---shell-bg: #20211f;
---sidebar-bg: #171817;
---surface-1: #2a2b29;
---surface-2: #181918;
---surface-hover: #323330;
---border: #42433f;
---border-soft: #363733;
---text-primary: #f4f4f1;
---text-secondary: #b9b9b3;
---text-muted: #858680;
---accent-blue: #58a9f8;
---accent-blue-bg: #07396d;
---danger: #ff716c;
---focus: #8cc7ff;
+--page-bg: #070809;
+--shell-bg: #1c1d1b;
+--sidebar-bg: #121312;
+--surface-1: #272825;
+--surface-2: #161715;
+--surface-hover: #30312e;
+--border: #3e3f3b;
+--border-soft: #2f302d;
+--text-primary: #f3f3ef;
+--text-secondary: #b6b6b0;
+--text-muted: #82837d;
+--accent-blue: #4aa3f5;
+--accent-blue-bg: #0a3358;
+--danger: #ff6b65;
+--focus: #8fc8ff;
+--signal: var(--accent-blue);
 ```
 
 ### Typography
 
-Use a neutral grotesk with compact proportions.
+Use a neutral system grotesk with compact proportions. Mono only for OTP digits and codes.
 
 ```css
-font-family: Inter, "SF Pro Text", "Segoe UI", Arial, sans-serif;
+font-family: Inter, "SF Pro Text", "Segoe UI", system-ui, Arial, sans-serif;
 ```
 
 | Role | Size | Weight | Line height |
@@ -62,10 +67,16 @@ Avoid oversized headings, serif type, gradients, and excessive letter spacing.
 ### Radius
 
 ```css
---radius-shell: 19px;
+--radius-shell: 18px;
 --radius-card: 14px;
 --radius-control: 10px;
 --radius-pill: 999px;
+```
+
+### Touch
+
+```css
+--touch: 44px; /* minimum interactive target on phone layouts */
 ```
 
 ### Spacing
@@ -310,33 +321,44 @@ Stroke width should remain visually consistent, approximately `1.8–2px`.
 
 ## 12. Responsive behavior
 
-### Tablet: 600–760px
+### Desktop: above 780px
 
-- Shell fills viewport with 8px margin.
-- Sidebar width reduces to `200px`.
+- Centered shell with rail + workspace grid (`236px` rail).
+- Signal edge visible on the shell left.
+- Sidebar navigation; mobile head hidden.
+
+### Tablet: 781–900px
+
+- Shell still two-column; rail may shrink to `~200px`.
 - Main padding reduces to `22px`.
-- Metadata card remains three columns.
 
-### Mobile: below 600px
+### Mobile: max-width 780px
 
-Preferred structure:
+Preferred structure — **bottom sheet**:
 
 ```text
 ┌────────────────────────────┐
-│ Top bar: mark + Account    │
-│ Compact user identity      │
-│ Horizontal nav / menu      │
+│           ── grip ──       │
+│ Close                 title│
+│ [Overview][Profile][…] pills│
 ├────────────────────────────┤
 │ Main account content       │
+│ (full width, no rail)      │
 └────────────────────────────┘
 ```
 
-- Remove fixed sidebar layout.
-- Shell radius may reduce to `14px` or become edge-to-edge below `420px`.
-- Account summary metadata becomes a 2-column grid, with the third item wrapping.
-- Action rows remain full width.
-- Right-side metadata may move beneath descriptions when width is constrained.
-- Bottom sign-out section stacks vertically; button becomes full width below `420px`.
+- Hide the fixed sidebar; show `.kt-mobile-head` pill nav (horizontal scroll).
+- Dialog anchors to the bottom, animates as a sheet (`kt-sheet`), shows `.kt-sheet-grip`.
+- Primary actions and form buttons stack full width; min touch target `44px`.
+- Toasts move to the bottom safe area.
+- Sign-out section stacks; button full width.
+- Auth dialog also becomes a bottom sheet.
+
+### Narrow phone: max-width 420px
+
+- Sheet goes edge-to-edge (`border-radius: 0`, full `100dvh`).
+- Summary metadata becomes a 2-column grid.
+- Action row status labels may hide; descriptions wrap.
 
 ---
 
@@ -347,6 +369,8 @@ Preferred structure:
 - Toggle updates visually and exposes an accessible state.
 - Sign-out requires an explicit confirmation before ending the session.
 - Truncated email addresses must expose the full value through `title`, tooltip, or accessible label.
+- Keyboard focus is always visible (`:focus-visible` ring using `--focus`).
+- `prefers-reduced-motion: reduce` zeroes animation/transition durations.
 - Do not animate the entire page repeatedly. A single `180–240ms` shell fade/slide on initial load is enough.
 
 Respect:

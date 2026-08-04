@@ -61,6 +61,7 @@ export function UserButton({
           aria-label={signedOutLabel}
           aria-haspopup="dialog"
           aria-expanded={authOpen}
+          data-signed-in="false"
           className={`kt-root kt-user-button kt-user-button-signed-out${className ? ` ${className}` : ""}`}
           style={{
             ...appearanceStyle({ ...inherited, ...appearance }),
@@ -93,6 +94,7 @@ export function UserButton({
         aria-label={label}
         aria-haspopup="dialog"
         aria-expanded={profileOpen}
+        data-signed-in="true"
         className={`kt-root kt-user-button${className ? ` ${className}` : ""}`}
         style={{
           ...appearanceStyle({ ...inherited, ...appearance }),
