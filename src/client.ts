@@ -9,6 +9,7 @@ import {
 } from "./query.js";
 import { createDefaultStorage } from "./storage.js";
 import { EdgeFunctionsClient } from "./functions.js";
+import { ImagesClient } from "./images.js";
 import type { ClientOptions, GenericDatabase, ResolvedClientOptions } from "./types.js";
 
 export const DEFAULT_API_URL = "https://tinybaseapis.knotree.com";
@@ -16,6 +17,7 @@ export const DEFAULT_API_URL = "https://tinybaseapis.knotree.com";
 export class TinyBaseClient<DB extends GenericDatabase = GenericDatabase> {
   readonly auth: AuthClient;
   readonly functions: EdgeFunctionsClient;
+  readonly images: ImagesClient;
   private readonly options: ResolvedClientOptions;
 
   constructor(options: ClientOptions) {
@@ -31,6 +33,7 @@ export class TinyBaseClient<DB extends GenericDatabase = GenericDatabase> {
     };
     this.auth = new AuthClient(this.options, () => this.requestContext());
     this.functions = new EdgeFunctionsClient(() => this.requestContext());
+    this.images = new ImagesClient(() => this.requestContext());
   }
 
   /** Typed query builder for a table. */

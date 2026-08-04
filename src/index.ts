@@ -1,8 +1,21 @@
 export { createClient, DEFAULT_API_URL, TinyBaseClient } from "./client.js";
 export { AuthClient } from "./auth.js";
 export { EdgeFunctionsClient } from "./functions.js";
+export { ImagesClient } from "./images.js";
 export { QueryBuilder } from "./query.js";
 export { MemoryStorage, createDefaultStorage } from "./storage.js";
+export type {
+  ImageFormat,
+  ImageJob,
+  ImageStatus,
+  ImageTier,
+  ImageTransformOptions,
+  ImageUploadOptions,
+  ImageUrlOptions,
+  ImageVariant,
+  ImageVisibility,
+  ProjectImage,
+} from "./images.js";
 export type {
   AccountSession,
   ApiError,
