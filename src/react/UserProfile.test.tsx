@@ -61,6 +61,8 @@ afterEach(() => {
 describe("React account UI", () => {
   it("opens a route-free dialog and updates the user profile", async () => {
     const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+      // Prefetch of sessions on open (hub "other devices") uses GET.
+      if (init?.method === "GET" || !init?.method) return response([] as AccountSession[]);
       expect(init?.method).toBe("PATCH");
       return response({ ...user, username: "ada-lovelace" });
     });
@@ -74,7 +76,7 @@ describe("React account UI", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect((await screen.findByRole("status")).textContent).toContain("Profile updated.");
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls.some((call) => call[1]?.method === "PATCH")).toBe(true);
   });
 
   it("loads sessions and revokes another device after confirmation-free row action", async () => {
@@ -117,7 +119,7 @@ describe("React account UI", () => {
   });
 
   it("traps the modal lifecycle and closes on Escape", async () => {
-    await setup(vi.fn<typeof fetch>());
+    await setup(vi.fn<typeof fetch>(async () => response([] as AccountSession[])));
     fireEvent.click(screen.getByRole("button", { name: "Open account settings" }));
     expect(await screen.findByRole("dialog")).toBeTruthy();
     fireEvent.keyDown(document, { key: "Escape" });
@@ -125,17 +127,24 @@ describe("React account UI", () => {
   });
 
   it("lands on the account dashboard with summary and action rows", async () => {
-    await setup(vi.fn<typeof fetch>());
+    await setup(vi.fn<typeof fetch>(async () => response([] as AccountSession[])));
     fireEvent.click(screen.getByRole("button", { name: "Open account settings" }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog.querySelector(".kt-summary")).toBeTruthy();
     expect(dialog.querySelector(".kt-action-list")).toBeTruthy();
     expect(dialog.querySelectorAll(".kt-action-row")).toHaveLength(4);
     expect(dialog.querySelector(".kt-signout-section")).toBeTruthy();
+    expect(dialog.querySelector(".kt-sidebar")).toBeTruthy();
+    expect(dialog.querySelector(".kt-content")).toBeTruthy();
     expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Edit profile");
     expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Password & security");
     expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Active sessions");
     expect(dialog.querySelector(".kt-action-list")?.textContent).toContain("Two-factor authentication");
+    // 2FA exposes switch semantics on the action row
+    expect(screen.getByRole("switch", { name: "Two-factor authentication" })).toBeTruthy();
+    // Truncated identity exposes full value via title
+    const emailEl = dialog.querySelector(".kt-summary-email");
+    expect(emailEl?.getAttribute("title")).toBe("ada@example.com");
   });
 
   it("respects appearance.mode override and password show/hide toggle", async () => {
@@ -144,7 +153,7 @@ describe("React account UI", () => {
     const client = createClient({
       projectKey: "tb_pk_test",
       storage,
-      fetch: vi.fn<typeof fetch>(async () => response(null)),
+      fetch: vi.fn<typeof fetch>(async () => response([] as AccountSession[])),
     });
     render(
       <KnotreeProvider client={client} appearance={{ mode: "dark" }}>

@@ -114,13 +114,16 @@ export function UserProfile({
     setNotice(null);
     const result = await client.auth.listSessions();
     setSessionsLoading(false);
-    if (result.data) setSessions(result.data);
-    else setNotice({ kind: "error", message: errMsg(result.error), id: Date.now() });
+    if (Array.isArray(result.data)) setSessions(result.data);
+    else if (result.error) setNotice({ kind: "error", message: errMsg(result.error), id: Date.now() });
+    else setSessions([]);
   }, [client]);
 
   useEffect(() => {
-    if (open && view === "sessions") void loadSessions();
-  }, [loadSessions, open, view]);
+    // Prefetch sessions when the dialog opens so hub metadata (other devices)
+    // is accurate; refresh again when landing on the sessions view.
+    if (open) void loadSessions();
+  }, [loadSessions, open]);
 
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
@@ -284,11 +287,11 @@ export function UserProfile({
 
   const nav: Array<{
     key: AccountView;
-    icon: "user" | "lock" | "sessions" | "sparkle";
+    icon: "user" | "lock" | "sessions" | "menu";
     label: string;
     badge?: number;
   }> = [
-    { key: "hub", icon: "sparkle", label: "Overview" },
+    { key: "hub", icon: "menu", label: "Overview" },
     { key: "profile", icon: "user", label: "Profile" },
     { key: "security", icon: "lock", label: "Security" },
     {
@@ -344,9 +347,9 @@ export function UserProfile({
           <div className="kt-account-mini">
             <span className="kt-avatar" aria-hidden="true">{initials}</span>
             <div className="kt-account-copy">
-              <div className="kt-account-name">{userName}</div>
+              <div className="kt-account-name" title={userName}>{userName}</div>
               {session.user.email ? (
-                <div className="kt-account-email">{session.user.email}</div>
+                <div className="kt-account-email" title={session.user.email}>{session.user.email}</div>
               ) : null}
             </div>
           </div>
@@ -383,7 +386,6 @@ export function UserProfile({
               className={`kt-notice kt-${notice.kind === "info" ? "info" : notice.kind}`}
               role={notice.kind === "error" ? "alert" : undefined}
               aria-live={notice.kind === "error" ? undefined : "polite"}
-              style={{ margin: "16px 34px 0" }}
             >
               <Icon name={notice.kind === "error" ? "alert" : notice.kind === "success" ? "check" : "info"} />
               <p>{notice.message}</p>
@@ -884,11 +886,13 @@ function AccountHub({
         <div className="kt-summary-identity">
           <span className="kt-avatar kt-avatar-lg" aria-hidden="true">{initials}</span>
           <div className="kt-summary-copy">
-            <div className="kt-summary-name" id="account-summary-title">
+            <div className="kt-summary-name" id="account-summary-title" title={name}>
               {name}
               <span className="kt-badge">{session.user.email_verified ? "Verified" : "Member"}</span>
             </div>
-            {session.user.email ? <div className="kt-summary-email" title={session.user.email}>{session.user.email}</div> : null}
+            {session.user.email ? (
+              <div className="kt-summary-email" title={session.user.email}>{session.user.email}</div>
+            ) : null}
           </div>
         </div>
         <div className="kt-summary-divider" />
@@ -914,10 +918,17 @@ function AccountHub({
           <span className="kt-action-copy"><strong>Active sessions</strong><span>Review and revoke devices where you are signed in.</span></span>
           <span className="kt-action-status">{otherSessionsCount} other</span>
         </button>
-        <button type="button" className="kt-action-row" onClick={onToggleTwoFactor}>
+        <button
+          type="button"
+          className="kt-action-row"
+          role="switch"
+          aria-checked={twoFactorEnabled}
+          aria-label="Two-factor authentication"
+          onClick={onToggleTwoFactor}
+        >
           <span className="kt-action-icon" aria-hidden="true"><Icon name="shield" /></span>
           <span className="kt-action-copy"><strong>Two-factor authentication</strong><span>Require a second step at sign-in.</span></span>
-          <span className="kt-switch" role="switch" aria-checked={twoFactorEnabled} aria-label="Two-factor authentication" data-checked={twoFactorEnabled}><span /></span>
+          <span className="kt-switch" data-checked={twoFactorEnabled} aria-hidden="true"><span /></span>
         </button>
       </section>
       <section className="kt-signout-section">

@@ -103,7 +103,9 @@ export function UserButton({
         <span className="kt-avatar" aria-hidden="true">
           {avatar}
         </span>
-        {showName && <span className="kt-user-label">{name}</span>}
+        {showName && (
+          <span className="kt-user-label" title={name}>{name}</span>
+        )}
         <Icon className="kt-chevron" name="chevron" />
       </button>
       <UserProfile
